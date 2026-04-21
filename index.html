@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="BudgetWise — Institutional Budget Management System. Track allocations, approvals, and departmental spending in real time." />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <title>BudgetWise | Institutional Budget Management</title>
+    <!-- Auth guard: redirect to login if no token -->
+    <script>
+        if (!localStorage.getItem('bw_token')) {
+            window.location.href = '/login.html';
+        }
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div id="app" class="app-container">
+
+        <!-- ===== SIDEBAR ===== -->
+        <aside id="sidebar">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i data-lucide="landmark" style="width:18px;height:18px;color:#fff;"></i>
+                </div>
+                <div class="logo-text">
+                    <h2 style="font-weight:800;font-size:1.1rem;color:var(--text-main);line-height:1.1;">BudgetWise</h2>
+                    <p style="font-size:0.7rem;color:var(--text-muted);" id="fiscal-year-label"></p>
+                </div>
+            </div>
+
+            <nav id="sidebar-nav" style="flex:1;overflow-y:auto;">
+                <!-- Nav items injected by JS -->
+            </nav>
+        </aside>
+
+        <!-- ===== MAIN WRAPPER ===== -->
+        <div class="main-wrapper" id="main-wrapper">
+
+            <!-- Header -->
+            <header id="app-header">
+                <div style="display:flex;align-items:center;gap:14px;">
+                    <button id="sidebar-toggle" aria-label="Toggle sidebar">
+                        <i data-lucide="panel-left-close" style="width:16px;height:16px;"></i>
+                    </button>
+                    <div id="page-title">
+                        <h1 style="font-size:1.4rem;font-weight:700;" id="current-title">Dashboard</h1>
+                    </div>
+                </div>
+
+                <!-- Profile -->
+                <div class="user-profile" id="profile-trigger">
+                    <div style="text-align:right;">
+                        <p style="font-size:0.88rem;font-weight:600;" id="user-name">Loading...</p>
+                        <p style="font-size:0.72rem;color:var(--text-muted);" id="user-role">—</p>
+                    </div>
+                    <div class="avatar-ring">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" alt="User avatar" />
+                    </div>
+                    <i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text-muted);transition:transform 0.2s;" id="profile-chevron"></i>
+
+                    <!-- Dropdown -->
+                    <div class="profile-dropdown" id="profile-dropdown">
+                        <div class="dropdown-header">
+                            <p style="font-weight:600;font-size:0.9rem;" id="dd-user-name">User</p>
+                            <p style="font-size:0.75rem;color:var(--text-muted);" id="dd-user-role">Role</p>
+                        </div>
+                        <div class="dropdown-item" id="dd-settings">
+                            <i data-lucide="settings"></i>
+                            <span>Settings</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" id="dd-logout" style="color:var(--color-danger);">
+                            <i data-lucide="log-out"></i>
+                            <span>Logout</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main id="main-content">
+                <!-- Injected by JS -->
+            </main>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <!-- Modal Container -->
+    <div id="modal-container"></div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
