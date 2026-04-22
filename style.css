@@ -1216,3 +1216,77 @@ aside.collapsed .sidebar-budget-health {
 .text-right   { text-align: right; }
 .fw-700       { font-weight: 700; }
 .fw-600       { font-weight: 600; }
+
+/* ============================================================
+   RESPONSIVE DESIGN (MEDIA QUERIES)
+   ============================================================ */
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    aside {
+        transform: translateX(0);
+        z-index: 1000;
+        width: var(--sidebar-width);
+    }
+    aside.collapsed {
+        transform: translateX(-100%);
+        width: var(--sidebar-width);
+    }
+    header {
+        width: 100% !important;
+        padding: 0 16px;
+    }
+    .user-profile {
+        padding: 4px 8px;
+        gap: 8px;
+    }
+    #page-title h1 {
+        font-size: 1.15rem !important;
+    }
+    .main-wrapper {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    main {
+        padding: 24px 16px;
+    }
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    .table-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .search-box {
+        max-width: 100%;
+    }
+    .insight-chip {
+        flex: 1;
+        justify-content: center;
+    }
+    .stat-card {
+        padding: 20px;
+    }
+    #dept-table-wrapper, #req-table-wrapper {
+        overflow-x: auto;
+    }
+    .data-table {
+        min-width: 600px; /* Ensure table doesn't squish too much */
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    .filter-tabs {
+        flex-wrap: wrap;
+    }
+    .user-profile > div:first-child {
+        display: none;
+    }
+}

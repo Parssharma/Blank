@@ -58,7 +58,13 @@ class App {
 
         this.user        = null;
         this.currentNav  = 'dash';
-        this.sidebarOpen = true;
+        this.sidebarOpen = window.innerWidth > 768;
+        
+        if (!this.sidebarOpen) {
+            this.sidebar?.classList.add('collapsed');
+            this.mainWrapper?.classList.add('sidebar-collapsed');
+            this.appHeader?.classList.add('sidebar-collapsed');
+        }
 
         // Table state
         this.tableFilter  = 'all';
@@ -102,6 +108,22 @@ class App {
             this.toggleProfileDropdown();
         });
         document.addEventListener('click', () => this.closeProfileDropdown());
+
+        /* ── Window Resize Listener ── */
+        window.addEventListener('resize', () => {
+            const isDesktop = window.innerWidth > 768;
+            if (this.sidebarOpen !== isDesktop) {
+                this.sidebarOpen = isDesktop;
+                this.sidebar?.classList.toggle('collapsed', !this.sidebarOpen);
+                this.mainWrapper?.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
+                this.appHeader?.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
+                const icon = document.querySelector('#sidebar-toggle i');
+                if (icon) {
+                    icon.setAttribute('data-lucide', this.sidebarOpen ? 'panel-left-close' : 'panel-left-open');
+                    if (window.lucide) lucide.createIcons();
+                }
+            }
+        });
 
         /* ── Dropdown actions ── */
         document.getElementById('dd-settings')?.addEventListener('click', () => {

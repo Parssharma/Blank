@@ -207,9 +207,10 @@
         }
 
         @media (max-width: 860px) {
-            .login-wrapper { grid-template-columns: 1fr; }
+            body { align-items: flex-start; }
+            .login-wrapper { display: flex; flex-direction: column; justify-content: center; min-height: 100vh; }
             .brand-panel { display: none; }
-            .auth-panel { padding: 40px 28px; }
+            .auth-panel { padding: 40px 20px; width: 100%; max-width: 480px; margin: 0 auto; }
         }
     </style>
 </head>
