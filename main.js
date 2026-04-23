@@ -55,6 +55,7 @@ class App {
         this.sidebar     = document.getElementById('sidebar');
         this.mainWrapper = document.getElementById('main-wrapper');
         this.appHeader   = document.getElementById('app-header');
+        this.mobileOverlay = document.getElementById('mobile-overlay');
 
         this.user        = null;
         this.currentNav  = 'dash';
@@ -102,6 +103,14 @@ class App {
         /* ── Sidebar toggle ── */
         document.getElementById('sidebar-toggle')?.addEventListener('click', () => this.toggleSidebar());
 
+        if (this.mobileOverlay) {
+            this.mobileOverlay.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && this.sidebarOpen) {
+                    this.toggleSidebar();
+                }
+            });
+        }
+
         /* ── Profile dropdown ── */
         document.getElementById('profile-trigger')?.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -117,11 +126,18 @@ class App {
                 this.sidebar?.classList.toggle('collapsed', !this.sidebarOpen);
                 this.mainWrapper?.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
                 this.appHeader?.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
+                
+                if (isDesktop) {
+                    this.mobileOverlay?.classList.remove('active');
+                }
+
                 const icon = document.querySelector('#sidebar-toggle i');
                 if (icon) {
                     icon.setAttribute('data-lucide', this.sidebarOpen ? 'panel-left-close' : 'panel-left-open');
                     if (window.lucide) lucide.createIcons();
                 }
+            } else if (!isDesktop) {
+                this.mobileOverlay?.classList.toggle('active', this.sidebarOpen);
             }
         });
 
@@ -146,6 +162,13 @@ class App {
         this.sidebar.classList.toggle('collapsed', !this.sidebarOpen);
         this.mainWrapper.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
         this.appHeader.classList.toggle('sidebar-collapsed', !this.sidebarOpen);
+        
+        if (window.innerWidth <= 768) {
+            this.mobileOverlay?.classList.toggle('active', this.sidebarOpen);
+        } else {
+            this.mobileOverlay?.classList.remove('active');
+        }
+
         const icon = document.querySelector('#sidebar-toggle i');
         if (icon) {
             icon.setAttribute('data-lucide', this.sidebarOpen ? 'panel-left-close' : 'panel-left-open');
@@ -260,6 +283,10 @@ class App {
                 this.tableFilter = 'all';
                 this.tableSearch = '';
                 this.render();
+
+                if (window.innerWidth <= 768 && this.sidebarOpen) {
+                    this.toggleSidebar();
+                }
             };
         });
     }

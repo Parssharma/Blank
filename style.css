@@ -326,6 +326,26 @@ aside.collapsed .nav-item span {
 /* ============================================================
    MAIN CONTENT
    ============================================================ */
+.mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 900;
+    opacity: 0;
+    pointer-events: none;
+    transition: var(--transition-md);
+}
+
+.mobile-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 .main-wrapper {
     flex: 1;
     margin-left: var(--sidebar-width);
