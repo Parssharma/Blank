@@ -1216,3 +1216,423 @@ aside.collapsed .sidebar-budget-health {
 .text-right   { text-align: right; }
 .fw-700       { font-weight: 700; }
 .fw-600       { font-weight: 600; }
+
+/* ============================================================
+   ANIMATION SUITE — Page Loader
+   ============================================================ */
+
+/* ── Keyframes ── */
+@keyframes loaderSpin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes loaderPulse {
+    0%, 100% { transform: scale(1);    opacity: 1;    }
+    50%       { transform: scale(1.08); opacity: 0.85; }
+}
+
+@keyframes loaderArc {
+    0%   { stroke-dashoffset: 314; }
+    60%  { stroke-dashoffset: 30;  }
+    100% { stroke-dashoffset: 0;   }
+}
+
+@keyframes loaderFadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes loaderBarShimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+}
+
+/* ── Overlay ── */
+#bw-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse 100% 100% at 50% 0%,
+                    rgba(124, 58, 237, 0.18) 0%, transparent 60%),
+                #060810;
+    opacity: 1;
+    transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+                transform  0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, transform;
+    cursor: none; /* hide native cursor while loading */
+}
+
+#bw-loader.bw-loader-exit {
+    opacity: 0;
+    transform: scale(1.03);
+    pointer-events: none;
+}
+
+/* ── Inner container ── */
+.bw-loader-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    animation: loaderFadeUp 0.5s ease 0.1s both;
+}
+
+/* ── Logo mark ── */
+.bw-loader-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: linear-gradient(135deg,
+        rgba(124, 58, 237, 0.25) 0%,
+        rgba(139, 92, 246, 0.10) 100%);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 40px rgba(124, 58, 237, 0.35),
+                0 0 80px rgba(124, 58, 237, 0.12),
+                inset 0 1px 0 rgba(255,255,255,0.08);
+    animation: loaderPulse 2s ease-in-out infinite;
+    margin-bottom: 28px;
+}
+
+.bw-loader-icon {
+    width: 34px;
+    height: 34px;
+}
+
+/* ── Spinning arc ring ── */
+.bw-loader-ring {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin-bottom: 28px;
+    animation: loaderSpin 2.4s linear infinite;
+}
+
+.bw-ring-svg { width: 100%; height: 100%; }
+
+.bw-ring-arc {
+    animation: loaderArc 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+    transform-origin: center;
+    /* rotate so gap is at the bottom */
+    transform: rotate(-90deg);
+}
+
+/* ── Text labels ── */
+.bw-loader-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 30%, var(--color-primary-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+    margin-bottom: 6px;
+    animation: loaderFadeUp 0.5s ease 0.35s both;
+}
+
+.bw-loader-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    margin-bottom: 32px;
+    animation: loaderFadeUp 0.5s ease 0.45s both;
+}
+
+/* ── Progress bar ── */
+.bw-loader-bar-track {
+    width: 220px;
+    height: 3px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 10px;
+    overflow: hidden;
+    animation: loaderFadeUp 0.5s ease 0.55s both;
+}
+
+.bw-loader-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 10px;
+    background: linear-gradient(to right,
+        rgba(124, 58, 237, 0.9) 0%,
+        rgba(139, 92, 246, 1)   50%,
+        rgba(16, 185, 129, 0.9) 100%);
+    background-size: 400px 100%;
+    transition: width 0.3s ease;
+    animation: loaderBarShimmer 1.8s linear infinite;
+}
+
+/* ============================================================
+   ANIMATION SUITE — 3-D Tilt Glare overlay
+   ============================================================ */
+.tilt-glare {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    border-radius: inherit;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.14) 0%,
+        rgba(255, 255, 255, 0.00) 80%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    transform-origin: center top;
+    /* Ensure it clips to the card shape */
+    overflow: hidden;
+}
+
+/* Give all tilt-able glass panels the CSS hint for GPU compositing */
+[data-tilt] {
+    transform-style: preserve-3d;
+    will-change: transform;
+    transform: perspective(800px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1);
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+                box-shadow 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ============================================================
+   ANIMATION SUITE — Scroll Reveal
+   ============================================================ */
+[data-reveal] {
+    opacity: 0;
+    transform: translateY(22px);
+    transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: opacity, transform;
+}
+
+[data-reveal="left"] {
+    transform: translateX(-24px);
+}
+
+[data-reveal="right"] {
+    transform: translateX(24px);
+}
+
+[data-reveal="scale"] {
+    transform: scale(0.94);
+}
+
+/* Staggered delays using nth-child within grid containers */
+[data-reveal]:nth-child(1) { transition-delay: 0.00s; }
+[data-reveal]:nth-child(2) { transition-delay: 0.07s; }
+[data-reveal]:nth-child(3) { transition-delay: 0.14s; }
+[data-reveal]:nth-child(4) { transition-delay: 0.21s; }
+[data-reveal]:nth-child(5) { transition-delay: 0.28s; }
+[data-reveal]:nth-child(6) { transition-delay: 0.35s; }
+
+[data-reveal].revealed {
+    opacity: 1;
+    transform: none;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Magnetic Cursor
+   ============================================================ */
+/* Hide only when the cursor module has actually initialised */
+body.bw-cursor-active {
+    cursor: none;
+}
+
+body.bw-cursor-active *,
+body.bw-cursor-active button,
+body.bw-cursor-active a,
+body.bw-cursor-active input,
+body.bw-cursor-active [role="button"] {
+    cursor: none !important;
+}
+
+/* Dot — snaps exactly to mouse */
+.bw-cursor-dot {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    background: var(--color-primary-light);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 99998;
+    opacity: 0;
+    transition: opacity 0.3s ease, width 0.2s ease, height 0.2s ease,
+                background 0.2s ease;
+    will-change: transform;
+}
+
+.bw-cursor-dot.bw-cursor-click {
+    width: 12px;
+    height: 12px;
+    background: var(--color-success);
+}
+
+/* Ring — lags behind mouse via JS lerp */
+.bw-cursor-ring {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(124, 58, 237, 0.55);
+    pointer-events: none;
+    z-index: 99997;
+    opacity: 0;
+    transition: opacity 0.3s ease,
+                width 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+                height 0.35s cubic-bezier(0.23, 1, 0.32, 1),
+                border-color 0.35s ease;
+    will-change: transform;
+}
+
+.bw-cursor-ring.bw-cursor-expand {
+    width: 56px;
+    height: 56px;
+    border-color: rgba(16, 185, 129, 0.6);
+    background: rgba(16, 185, 129, 0.06);
+}
+
+/* ============================================================
+   ANIMATION SUITE — Page Transition
+   ============================================================ */
+#main-content {
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    will-change: opacity, transform;
+}
+
+#main-content.page-exit {
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+}
+
+#main-content.page-enter {
+    opacity: 0;
+    transform: translateY(-8px);
+}
+
+#main-content.page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================
+   ANIMATION SUITE — Micro Particles (click burst)
+   ============================================================ */
+@keyframes particleBurst {
+    0%   { opacity: 1; transform: translate(0, 0)  scale(1);    }
+    80%  { opacity: 0.6; }
+    100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); }
+}
+
+.bw-particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 99996;
+    transform-origin: center;
+    animation: particleBurst 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Floating ambient orbs (background)
+   ============================================================ */
+@keyframes orbFloat {
+    0%, 100% { transform: translateY(0)   scale(1);    opacity: 0.55; }
+    33%       { transform: translateY(-18px) scale(1.04); opacity: 0.70; }
+    66%       { transform: translateY(10px)  scale(0.97); opacity: 0.50; }
+}
+
+.bw-orb {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(60px);
+    animation: orbFloat var(--orb-dur, 8s) ease-in-out infinite;
+    animation-delay: var(--orb-delay, 0s);
+    will-change: transform, opacity;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Enhanced button press ripple
+   ============================================================ */
+@keyframes rippleExpand {
+    to { transform: scale(4); opacity: 0; }
+}
+
+.btn {
+    /* Allow ripple positioning */
+    overflow: hidden;
+}
+
+.btn-ripple {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.35);
+    transform: scale(0);
+    animation: rippleExpand 0.5s linear;
+    pointer-events: none;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Sidebar nav item entrance
+   ============================================================ */
+@keyframes navSlideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+#sidebar-nav .nav-item {
+    animation: navSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+#sidebar-nav .nav-item:nth-child(1) { animation-delay: 0.05s; }
+#sidebar-nav .nav-item:nth-child(2) { animation-delay: 0.10s; }
+#sidebar-nav .nav-item:nth-child(3) { animation-delay: 0.15s; }
+#sidebar-nav .nav-item:nth-child(4) { animation-delay: 0.20s; }
+#sidebar-nav .nav-item:nth-child(5) { animation-delay: 0.25s; }
+
+/* ============================================================
+   ANIMATION SUITE — Header entrance
+   ============================================================ */
+@keyframes headerSlideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+header {
+    animation: headerSlideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.1s both;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Number counter (for stat values)
+   ============================================================ */
+.stat-value[data-count] {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+/* ============================================================
+   ANIMATION SUITE — Toast enhanced entrance
+   ============================================================ */
+@keyframes toastBounceIn {
+    0%   { transform: translateX(110%) scale(0.9); opacity: 0; }
+    65%  { transform: translateX(-6px)  scale(1.02); opacity: 1; }
+    100% { transform: translateX(0)    scale(1);    opacity: 1; }
+}
+
+.toast {
+    animation: toastBounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+

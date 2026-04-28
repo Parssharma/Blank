@@ -1,6 +1,49 @@
 import { authApi, deptApi, requestApi, isAuthenticated, getUser, setUser, getFiscalYear } from './src/data/api.js';
 import { Chart, registerables } from 'chart.js';
+import { initAnimations } from './src/animations.js';
 Chart.register(...registerables);
+
+/* ── Boot animation suite immediately (before App class) ── */
+const _anim = initAnimations();
+const _loader     = _anim.loader;        // PageLoader
+const _transition = _anim.transition;    // PageTransition
+
+/* ── Inject ambient floating orbs into page background ── */
+(function injectOrbs() {
+    const orbs = [
+        { size: 320, color: 'rgba(124,58,237,0.12)', top: '5%',  left: '-8%',  dur: '9s',  delay: '0s'   },
+        { size: 260, color: 'rgba(16,185,129,0.08)', top: '60%', right: '-6%', dur: '11s', delay: '-4s'  },
+        { size: 180, color: 'rgba(59,130,246,0.07)', top: '35%', left: '40%',  dur: '13s', delay: '-7s'  },
+    ];
+    orbs.forEach(o => {
+        const el = document.createElement('div');
+        el.className = 'bw-orb';
+        Object.assign(el.style, {
+            width: `${o.size}px`, height: `${o.size}px`,
+            background: o.color,
+            top: o.top, left: o.left || 'unset',
+            right: o.right || 'unset',
+            '--orb-dur':   o.dur,
+            '--orb-delay': o.delay,
+        });
+        document.body.appendChild(el);
+    });
+})();
+
+/* ── Button ripple micro-interaction ── */
+document.addEventListener('click', e => {
+    const btn = e.target.closest('.btn');
+    if (!btn) return;
+    const rect   = btn.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'btn-ripple';
+    Object.assign(ripple.style, {
+        left: `${e.clientX - rect.left - 4}px`,
+        top:  `${e.clientY - rect.top  - 4}px`,
+    });
+    btn.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+}, true);
 
 /* ============================================================
    UTILITIES
@@ -59,6 +102,7 @@ class App {
         this.user        = null;
         this.currentNav  = 'dash';
         this.sidebarOpen = true;
+        this._firstRender = true; // track first render for loader
 
         // Table state
         this.tableFilter  = 'all';
@@ -66,6 +110,9 @@ class App {
         this.tableSortKey = 'date';
         this.tableSortAsc = false;
         this.deptSearch   = '';
+
+        // Activate custom cursor body class
+        document.body.classList.add('bw-cursor-active');
 
         this.init();
     }
@@ -150,6 +197,11 @@ class App {
     async render() {
         if (!this.user) return;
 
+        /* ── Page transition: fade out content before swap ── */
+        if (!this._firstRender) {
+            await _transition.play();
+        }
+
         /* Update header profile */
         const el = (id) => document.getElementById(id);
         if (el('user-name')) el('user-name').textContent = this.user.name;
@@ -193,6 +245,15 @@ class App {
             </div>`;
         }
         lucide.createIcons();
+
+        /* ── Page transition: fade content back in ── */
+        if (!this._firstRender) {
+            await _transition.done();
+        } else {
+            /* First render: dismiss the page loader */
+            this._firstRender = false;
+            _loader.dismiss();
+        }
     }
 
     /* ----------------------------------------------------------
@@ -283,7 +344,7 @@ class App {
 
         this.content.innerHTML = `
             <div class="dashboard-grid">
-                <div class="glass-panel stat-card primary">
+                <div class="glass-panel stat-card primary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:rgba(124,58,237,0.15);">
                         <i data-lucide="wallet" style="width:18px;height:18px;color:var(--color-primary-light);"></i>
                     </div>
@@ -292,7 +353,7 @@ class App {
                     <div class="stat-progress"><div class="stat-progress-fill" style="width:100%;background:linear-gradient(to right,var(--color-primary),var(--color-primary-light));"></div></div>
                     <span class="stat-sub">Current fiscal year budget</span>
                 </div>
-                <div class="glass-panel stat-card secondary">
+                <div class="glass-panel stat-card secondary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:var(--color-success-bg);">
                         <i data-lucide="trending-up" style="width:18px;height:18px;color:var(--color-success);"></i>
                     </div>
@@ -301,7 +362,7 @@ class App {
                     <div class="stat-progress"><div class="stat-progress-fill ${progressClass(usedPct)}" style="width:${usedPct}%;"></div></div>
                     <span class="stat-sub">${usedPct}% of budget used</span>
                 </div>
-                <div class="glass-panel stat-card secondary">
+                <div class="glass-panel stat-card secondary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:var(--color-warning-bg);">
                         <i data-lucide="clock" style="width:18px;height:18px;color:var(--color-warning);"></i>
                     </div>
@@ -310,7 +371,7 @@ class App {
                     <div class="stat-progress"><div class="stat-progress-fill mid" style="width:${Math.min(Math.round((stats.pending/stats.budget)*100),100)}%;"></div></div>
                     <span class="stat-sub">Awaiting admin approval</span>
                 </div>
-                <div class="glass-panel stat-card secondary">
+                <div class="glass-panel stat-card secondary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:rgba(59,130,246,0.1);">
                         <i data-lucide="piggy-bank" style="width:18px;height:18px;color:var(--color-info);"></i>
                     </div>
@@ -324,7 +385,7 @@ class App {
             ${this.renderInsightsBar(insights)}
 
             <div class="content-grid">
-                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.25s both;">
+                <div class="glass-panel" data-reveal style="padding:28px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                         <h3 style="font-weight:700;font-size:1rem;">Expenditure History</h3>
                         <button class="btn btn-primary btn-sm" id="open-request-modal">
@@ -334,7 +395,7 @@ class App {
                     ${this.renderTableControls('dept-table')}
                     <div id="dept-table-wrapper">${this.renderRequestsTable(requests, 'dept-table')}</div>
                 </div>
-                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.3s both;">
+                <div class="glass-panel" data-tilt data-reveal="scale" style="padding:28px;">
                     <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Budget Utilization</h3>
                     <div class="chart-wrapper" style="position:relative;">
                         <canvas id="utilization-chart"></canvas>
@@ -373,7 +434,7 @@ class App {
 
         this.content.innerHTML = `
             <div class="dashboard-grid">
-                <div class="glass-panel stat-card primary">
+                <div class="glass-panel stat-card primary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:rgba(124,58,237,0.15);">
                         <i data-lucide="university" style="width:18px;height:18px;color:var(--color-primary-light);"></i>
                     </div>
@@ -382,7 +443,7 @@ class App {
                     <div class="stat-progress"><div class="stat-progress-fill" style="width:100%;background:linear-gradient(to right,var(--color-primary),var(--color-primary-light));"></div></div>
                     <span class="stat-sub">Across ${depts.length} departments</span>
                 </div>
-                <div class="glass-panel stat-card secondary">
+                <div class="glass-panel stat-card secondary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:var(--color-danger-bg);">
                         <i data-lucide="credit-card" style="width:18px;height:18px;color:var(--color-danger);"></i>
                     </div>
@@ -391,7 +452,7 @@ class App {
                     <div class="stat-progress"><div class="stat-progress-fill ${progressClass(burnPct)}" style="width:${burnPct}%;"></div></div>
                     <span class="stat-sub">${burnPct}% institutional burn rate</span>
                 </div>
-                <div class="glass-panel stat-card secondary">
+                <div class="glass-panel stat-card secondary" data-tilt data-reveal>
                     <div class="stat-icon" style="background:var(--color-warning-bg);">
                         <i data-lucide="inbox" style="width:18px;height:18px;color:var(--color-warning);"></i>
                     </div>
@@ -405,7 +466,7 @@ class App {
             ${this.renderInsightsBar(insights)}
 
             <div class="content-grid">
-                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.25s both;">
+                <div class="glass-panel" data-reveal style="padding:28px;">
                     <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Pending Approvals</h3>
                     ${pending.length === 0
                         ? `<div class="empty-state"><div class="empty-icon">🎉</div><p style="font-size:1rem;font-weight:600;margin-bottom:6px;">All caught up!</p><p>No pending requests found.</p></div>`
@@ -432,7 +493,7 @@ class App {
                            </div>`
                     }
                 </div>
-                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.3s both;">
+                <div class="glass-panel" data-tilt data-reveal="scale" style="padding:28px;">
                     <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Allocations by Department</h3>
                     <canvas id="allocation-chart"></canvas>
                 </div>
@@ -571,7 +632,7 @@ class App {
                     const rem = d.remaining ?? (d.budget - d.spent);
                     const fc  = progressClass(pct);
                     return `
-                        <div class="glass-panel dept-card" style="padding:26px;animation-delay:${i*0.07}s;">
+                        <div class="glass-panel dept-card" data-tilt data-reveal style="padding:26px;animation-delay:${i*0.07}s;">
                             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
                                 <h4 style="font-weight:700;font-size:0.95rem;">${d.name}</h4>
                                 <span class="badge" style="background:rgba(124,58,237,0.1);color:var(--color-primary-light);border:1px solid var(--color-primary-border);">Active</span>

@@ -55,6 +55,31 @@
             100% { background-position: 400px 0; }
         }
 
+        /* ── Login-specific extra animations ── */
+        @keyframes featureSlide {
+            from { opacity:0; transform:translateX(-14px); }
+            to   { opacity:1; transform:translateX(0); }
+        }
+        @keyframes authPanelIn {
+            from { opacity:0; transform:translateX(24px) scale(0.97); }
+            to   { opacity:1; transform:translateX(0)    scale(1); }
+        }
+        @keyframes brandIn {
+            from { opacity:0; transform:translateY(-16px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes orbFloat {
+            0%, 100% { transform: translateY(0)    scale(1);    opacity:0.55; }
+            33%       { transform: translateY(-18px) scale(1.04); opacity:0.70; }
+            66%       { transform: translateY(10px)  scale(0.97); opacity:0.50; }
+        }
+        @keyframes particleBurst {
+            0%   { opacity:1; transform:translate(0,0)   scale(1); }
+            80%  { opacity:0.6; }
+            100% { opacity:0; transform:translate(var(--tx),var(--ty)) scale(0); }
+        }
+        @keyframes rippleExpand { to { transform:scale(4); opacity:0; } }
+
         /* ── Left Branding ── */
         .brand-panel {
             display: flex;
@@ -205,6 +230,85 @@
         .divider::before, .divider::after {
             content: ''; flex: 1; height: 1px; background: var(--card-border);
         }
+
+        /* ── Floating ambient orbs ── */
+        .lg-orb {
+            position: fixed; border-radius:50%; pointer-events:none; z-index:0;
+            filter:blur(70px);
+            animation: orbFloat var(--d,9s) ease-in-out infinite;
+            animation-delay: var(--dl,0s);
+        }
+
+        /* ── 3-D Tilt panel ── */
+        .auth-panel {
+            transform-style: preserve-3d;
+            will-change: transform;
+            transition: transform 0.5s cubic-bezier(0.23,1,0.32,1),
+                        box-shadow 0.5s cubic-bezier(0.23,1,0.32,1);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .auth-tilt-glare {
+            position:absolute; inset:0; pointer-events:none;
+            background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 80%);
+            opacity:0; border-radius:inherit;
+            transition: opacity 0.3s ease;
+            z-index:20;
+        }
+
+        /* ── Custom cursor ── */
+        body.lc-cursor { cursor:none; }
+        body.lc-cursor * { cursor:none !important; }
+        .lc-dot {
+            position:fixed; top:0; left:0; width:8px; height:8px;
+            background:#8b5cf6; border-radius:50%;
+            pointer-events:none; z-index:99998; opacity:0;
+            transition: opacity 0.3s, width 0.2s, height 0.2s, background 0.2s;
+            will-change:transform;
+        }
+        .lc-ring {
+            position:fixed; top:0; left:0; width:38px; height:38px;
+            border:1.5px solid rgba(124,58,237,0.55); border-radius:50%;
+            pointer-events:none; z-index:99997; opacity:0;
+            transition: opacity 0.3s, width 0.3s, height 0.3s, border-color 0.3s;
+            will-change:transform;
+        }
+        .lc-ring.expand { width:54px; height:54px; border-color:rgba(16,185,129,0.6); }
+        .lc-dot.clicked { width:12px; height:12px; background:#10b981; }
+
+        /* ── Particles ── */
+        .lc-particle {
+            position:fixed; border-radius:50%; pointer-events:none;
+            z-index:99996;
+            animation: particleBurst 0.55s cubic-bezier(0.4,0,0.2,1) both;
+        }
+
+        /* ── Ripple ── */
+        .btn-submit { overflow:hidden; }
+        .lc-ripple {
+            position:absolute; width:8px; height:8px; border-radius:50%;
+            background:rgba(255,255,255,0.35); transform:scale(0);
+            animation:rippleExpand 0.5s linear; pointer-events:none;
+        }
+
+        /* ── Stagger entrance for feature list ── */
+        .feature-item {
+            opacity:0;
+            animation: featureSlide 0.4s cubic-bezier(0.4,0,0.2,1) both;
+        }
+        .feature-item:nth-child(1) { animation-delay:0.30s; }
+        .feature-item:nth-child(2) { animation-delay:0.42s; }
+        .feature-item:nth-child(3) { animation-delay:0.54s; }
+        .feature-item:nth-child(4) { animation-delay:0.66s; }
+
+        /* ── Brand panel entrance ── */
+        .brand-logo  { animation: brandIn 0.5s ease 0.05s both; }
+        .brand-pitch { animation: brandIn 0.5s ease 0.12s both; }
+        .brand-desc  { animation: brandIn 0.5s ease 0.20s both; }
+
+        /* ── Auth panel entrance ── */
+        .auth-panel { animation: authPanelIn 0.55s cubic-bezier(0.4,0,0.2,1) 0.1s both; }
 
         @media (max-width: 860px) {
             .login-wrapper { grid-template-columns: 1fr; }
@@ -468,6 +572,126 @@
         }
 
 
+        /* ══════════════════════════════════════════
+           ANIMATION SUITE — Login Page Scripts
+           ══════════════════════════════════════════ */
+
+        /* ── 1. Ambient floating orbs ── */
+        (function() {
+            const defs = [
+                { c:'rgba(124,58,237,0.13)', s:340, t:'8%',  l:'-10%', d:'9s',  dl:'0s'   },
+                { c:'rgba(16,185,129,0.08)', s:280, t:'65%', r:'-8%',  d:'11s', dl:'-4s'  },
+                { c:'rgba(59,130,246,0.07)', s:200, t:'40%', l:'45%',  d:'14s', dl:'-8s'  },
+            ];
+            defs.forEach(o => {
+                const el = document.createElement('div');
+                el.className = 'lg-orb';
+                Object.assign(el.style, {
+                    width:`${o.s}px`, height:`${o.s}px`, background:o.c,
+                    top:o.t, left:o.l||'unset', right:o.r||'unset',
+                    '--d':o.d, '--dl':o.dl
+                });
+                document.body.appendChild(el);
+            });
+        })();
+
+        /* ── 2. Custom magnetic cursor (desktop only) ── */
+        (function() {
+            if (window.matchMedia('(hover:none)').matches) return;
+            const dot  = document.createElement('div'); dot.className  = 'lc-dot';
+            const ring = document.createElement('div'); ring.className = 'lc-ring';
+            document.body.appendChild(dot); document.body.appendChild(ring);
+            document.body.classList.add('lc-cursor');
+
+            let mx=0, my=0, rx=0, ry=0, active=false;
+
+            document.addEventListener('mousemove', e => {
+                mx=e.clientX; my=e.clientY;
+                if (!active) {
+                    active=true;
+                    dot.style.opacity='1'; ring.style.opacity='1';
+                }
+            });
+            document.addEventListener('mouseleave', () => {
+                dot.style.opacity='0'; ring.style.opacity='0'; active=false;
+            });
+            document.addEventListener('mouseover', e => {
+                if (e.target.closest('button,a,input,select,[data-magnetic]'))
+                    ring.classList.add('expand');
+            });
+            document.addEventListener('mouseout', e => {
+                if (e.target.closest('button,a,input,select,[data-magnetic]'))
+                    ring.classList.remove('expand');
+            });
+            document.addEventListener('mousedown', () => dot.classList.add('clicked'));
+            document.addEventListener('mouseup',   () => dot.classList.remove('clicked'));
+
+            (function loop() {
+                rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
+                dot.style.transform  = `translate(${mx-4}px,${my-4}px)`;
+                ring.style.transform = `translate(${rx-19}px,${ry-19}px)`;
+                requestAnimationFrame(loop);
+            })();
+        })();
+
+        /* ── 3. Micro-particle burst on click ── */
+        document.addEventListener('click', e => {
+            if (e.target.closest('input,select,textarea')) return;
+            const colors = ['#7c3aed','#8b5cf6','#10b981','#3b82f6'];
+            for (let i=0; i<8; i++) {
+                const p = document.createElement('div'); p.className='lc-particle';
+                const angle  = (Math.PI*2*i/8) + (Math.random()-0.5)*0.6;
+                const radius = 28 + Math.random()*38;
+                Object.assign(p.style, {
+                    left:`${e.clientX}px`, top:`${e.clientY}px`,
+                    width:`${4+Math.random()*5}px`, height:`${4+Math.random()*5}px`,
+                    background: colors[Math.floor(Math.random()*colors.length)],
+                    '--tx':`${Math.cos(angle)*radius}px`,
+                    '--ty':`${Math.sin(angle)*radius}px`,
+                });
+                document.body.appendChild(p);
+                p.addEventListener('animationend', () => p.remove(), {once:true});
+            }
+        });
+
+        /* ── 4. Button ripple ── */
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.btn-submit');
+            if (!btn) return;
+            const r = btn.getBoundingClientRect();
+            const rpl = document.createElement('span'); rpl.className='lc-ripple';
+            Object.assign(rpl.style, { left:`${e.clientX-r.left-4}px`, top:`${e.clientY-r.top-4}px` });
+            btn.appendChild(rpl);
+            rpl.addEventListener('animationend', () => rpl.remove(), {once:true});
+        }, true);
+
+        /* ── 5. 3-D tilt on auth panel ── */
+        (function() {
+            const panel = document.querySelector('.auth-panel');
+            if (!panel) return;
+
+            // Inject glare div
+            const glare = document.createElement('div'); glare.className='auth-tilt-glare';
+            panel.appendChild(glare);
+
+            panel.addEventListener('mousemove', e => {
+                const rect = panel.getBoundingClientRect();
+                const xRel = (e.clientX - rect.left) / rect.width;
+                const yRel = (e.clientY - rect.top)  / rect.height;
+                const rotX = (yRel-0.5)*-7;
+                const rotY = (xRel-0.5)* 7;
+                panel.style.transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.015,1.015,1.015)`;
+                panel.style.transition = 'transform 0.1s ease';
+                glare.style.opacity = `${0.06 + xRel*0.10}`;
+                const angle = Math.atan2(e.clientY-rect.top-rect.height/2, e.clientX-rect.left-rect.width/2)*(180/Math.PI)+90;
+                glare.style.transform = `rotate(${angle}deg)`;
+            });
+            panel.addEventListener('mouseleave', () => {
+                panel.style.transform  = 'perspective(900px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)';
+                panel.style.transition = 'transform 0.55s cubic-bezier(0.23,1,0.32,1)';
+                glare.style.opacity = '0';
+            });
+        })();
     </script>
 </body>
 </html>
