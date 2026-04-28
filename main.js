@@ -336,9 +336,9 @@ class App {
             requestApi.getInsights(deptId)
         ]);
 
-        const stats    = statsRes.data;
-        const requests = reqsRes.data;
-        const insights = insightsRes.data;
+        const stats    = statsRes?.data    ?? { budget:0, spent:0, pending:0, remaining:0, utilizationPct:0 };
+        const requests = reqsRes?.data     ?? [];
+        const insights = insightsRes?.data ?? null;
         const usedPct  = stats.utilizationPct ?? 0;
         const remPct   = 100 - usedPct;
 
@@ -706,8 +706,20 @@ class App {
         this.renderSkeleton();
 
         const deptId = this.user.department?._id;
-        const res    = await requestApi.getAll(deptId ? { department: deptId } : {});
-        const requests = res.data;
+
+        /* Guard: dept head with no department assigned */
+        if (!deptId) {
+            this.content.innerHTML = `
+                <div class="glass-panel" style="padding:40px;text-align:center;">
+                    <div style="font-size:2.5rem;margin-bottom:16px;">🏢</div>
+                    <p style="font-weight:700;font-size:1rem;margin-bottom:8px;">No Department Assigned</p>
+                    <p style="color:var(--text-muted);font-size:0.88rem;">Your account has not been linked to a department yet.<br>Please contact an administrator to assign your department.</p>
+                </div>`;
+            return;
+        }
+
+        const res      = await requestApi.getAll({ department: deptId });
+        const requests = res?.data ?? [];
 
         this.content.innerHTML = `
             <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.4s ease both;">
