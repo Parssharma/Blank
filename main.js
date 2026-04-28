@@ -782,8 +782,20 @@ class App {
         this.renderSkeleton();
 
         const deptId = this.user.department?._id;
+
+        /* Guard: no department assigned */
+        if (!deptId) {
+            this.content.innerHTML = `
+                <div class="glass-panel" style="padding:40px;text-align:center;">
+                    <div style="font-size:2.5rem;margin-bottom:16px;">📊</div>
+                    <p style="font-weight:700;font-size:1rem;margin-bottom:8px;">No Department Assigned</p>
+                    <p style="color:var(--text-muted);font-size:0.88rem;">Your account has not been linked to a department yet.<br>Please contact an administrator to assign your department.</p>
+                </div>`;
+            return;
+        }
+
         const res    = await deptApi.getStats(deptId);
-        const stats  = res.data;
+        const stats  = res?.data ?? { budget:0, spent:0, remaining:0, utilizationPct:0 };
         const usedPct = stats.utilizationPct ?? 0;
 
         this.content.innerHTML = `
