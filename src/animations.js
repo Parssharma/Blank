@@ -290,6 +290,7 @@ export class MagneticCursor {
         this._ring = null;
         this._mx   = 0; this._my = 0; // raw mouse
         this._rx   = 0; this._ry = 0; // ring (lagging)
+        this._prevMx = 0; this._prevMy = 0; // for velocity
         this._raf  = null;
         this._active = false;
     }
@@ -303,8 +304,11 @@ export class MagneticCursor {
         this._ring = this._createNode('bw-cursor-ring');
         document.body.appendChild(this._dot);
         document.body.appendChild(this._ring);
+        document.body.classList.add('bw-cursor-active');
 
         document.addEventListener('mousemove', e => {
+            this._prevMx = this._mx;
+            this._prevMy = this._my;
             this._mx = e.clientX;
             this._my = e.clientY;
             if (!this._active) {
@@ -320,17 +324,28 @@ export class MagneticCursor {
             this._active = false;
         });
 
-        // Magnetic pull on interactive elements
+        // Magnetic pull + text detection
         document.addEventListener('mouseover', e => {
-            const target = e.target.closest('[data-magnetic], .btn, button, a');
-            if (target) {
+            const magnetic = e.target.closest('[data-magnetic], .btn, button, a');
+            const textEl   = e.target.closest('input[type="text"], input[type="email"], input[type="password"], textarea, [contenteditable]');
+
+            if (textEl) {
+                this._dot.classList.add('bw-cursor-text');
+                this._ring.classList.add('bw-cursor-text-mode');
+                this._ring.classList.remove('bw-cursor-expand');
+            } else if (magnetic) {
                 this._ring.classList.add('bw-cursor-expand');
+                this._dot.classList.remove('bw-cursor-text');
+                this._ring.classList.remove('bw-cursor-text-mode');
             }
         });
+
         document.addEventListener('mouseout', e => {
-            const target = e.target.closest('[data-magnetic], .btn, button, a');
-            if (target) {
-                this._ring.classList.remove('bw-cursor-expand');
+            const magnetic = e.target.closest('[data-magnetic], .btn, button, a');
+            const textEl   = e.target.closest('input[type="text"], input[type="email"], input[type="password"], textarea, [contenteditable]');
+            if (magnetic || textEl) {
+                this._ring.classList.remove('bw-cursor-expand', 'bw-cursor-text-mode');
+                this._dot.classList.remove('bw-cursor-text');
             }
         });
 
@@ -350,11 +365,29 @@ export class MagneticCursor {
 
     _loop() {
         // Lerp ring towards mouse position
-        this._rx += (this._mx - this._rx) * 0.12;
-        this._ry += (this._my - this._ry) * 0.12;
+        this._rx += (this._mx - this._rx) * 0.10;
+        this._ry += (this._my - this._ry) * 0.10;
 
-        if (this._dot)  { this._dot.style.transform  = `translate(${this._mx - 4}px, ${this._my - 4}px)`; }
-        if (this._ring) { this._ring.style.transform = `translate(${this._rx - 20}px, ${this._ry - 20}px)`; }
+        // Velocity-based squish on the ring
+        const vx = this._mx - this._prevMx;
+        const vy = this._my - this._prevMy;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        const squish = Math.min(speed * 0.012, 0.18); // max 18% squish
+        const angle  = speed > 1 ? Math.atan2(vy, vx) : 0;
+        const scaleX = 1 + squish;
+        const scaleY = 1 - squish * 0.5;
+
+        // Ring: offset by half its size (22px) to centre it
+        if (this._dot)  {
+            this._dot.style.transform  = `translate(${this._mx - 5}px, ${this._my - 5}px)`;
+        }
+        if (this._ring) {
+            this._ring.style.transform = `translate(${this._rx - 22}px, ${this._ry - 22}px) rotate(${angle}rad) scale(${scaleX}, ${scaleY})`;
+        }
+
+        // Decay prev toward current for smooth velocity fade-out
+        this._prevMx += (this._mx - this._prevMx) * 0.25;
+        this._prevMy += (this._my - this._prevMy) * 0.25;
 
         this._raf = requestAnimationFrame(() => this._loop());
     }
@@ -363,6 +396,7 @@ export class MagneticCursor {
         if (this._raf) cancelAnimationFrame(this._raf);
         this._dot?.remove();
         this._ring?.remove();
+        document.body.classList.remove('bw-cursor-active');
     }
 }
 

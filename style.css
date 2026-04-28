@@ -1434,9 +1434,19 @@ aside.collapsed .sidebar-budget-health {
 }
 
 /* ============================================================
-   ANIMATION SUITE — Magnetic Cursor
+   ANIMATION SUITE — Premium Magnetic Cursor
    ============================================================ */
-/* Hide only when the cursor module has actually initialised */
+
+@keyframes cursorRingSpin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes cursorDotPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.5), 0 0 12px 4px rgba(139, 92, 246, 0.3); }
+    50%       { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0), 0 0 20px 8px rgba(139, 92, 246, 0.15); }
+}
+
+/* Hide native cursor only when module has initialised */
 body.bw-cursor-active {
     cursor: none;
 }
@@ -1449,53 +1459,121 @@ body.bw-cursor-active [role="button"] {
     cursor: none !important;
 }
 
-/* Dot — snaps exactly to mouse */
+/* ── DOT — snaps to mouse instantly ── */
 .bw-cursor-dot {
     position: fixed;
     top: 0;
     left: 0;
-    width: 8px;
-    height: 8px;
-    background: var(--color-primary-light);
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     pointer-events: none;
-    z-index: 99998;
+    z-index: 99999;
     opacity: 0;
-    transition: opacity 0.3s ease, width 0.2s ease, height 0.2s ease,
-                background 0.2s ease;
+    background: radial-gradient(circle, #fff 20%, #a78bfa 60%, #7c3aed 100%);
+    box-shadow: 0 0 10px 3px rgba(139, 92, 246, 0.6),
+                0 0 24px 6px rgba(124, 58, 237, 0.3);
+    animation: cursorDotPulse 2s ease-in-out infinite;
+    transition: opacity 0.3s ease,
+                width  0.15s cubic-bezier(0.23, 1, 0.32, 1),
+                height 0.15s cubic-bezier(0.23, 1, 0.32, 1),
+                background 0.2s ease,
+                box-shadow 0.2s ease;
     will-change: transform;
 }
 
+/* Click squish */
 .bw-cursor-dot.bw-cursor-click {
-    width: 12px;
-    height: 12px;
-    background: var(--color-success);
+    width: 7px;
+    height: 7px;
+    background: radial-gradient(circle, #fff 20%, #34d399 60%, #10b981 100%);
+    box-shadow: 0 0 12px 4px rgba(16, 185, 129, 0.7),
+                0 0 28px 8px rgba(16, 185, 129, 0.3);
 }
 
-/* Ring — lags behind mouse via JS lerp */
+/* Text-hover: morph into a thin beam */
+.bw-cursor-dot.bw-cursor-text {
+    width: 3px;
+    height: 22px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, #a78bfa, #7c3aed);
+    box-shadow: 0 0 8px 2px rgba(139, 92, 246, 0.6);
+    animation: none;
+}
+
+/* ── RING — lags behind mouse via JS lerp ── */
 .bw-cursor-ring {
     position: fixed;
     top: 0;
     left: 0;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 1.5px solid rgba(124, 58, 237, 0.55);
     pointer-events: none;
-    z-index: 99997;
+    z-index: 99998;
     opacity: 0;
-    transition: opacity 0.3s ease,
-                width 0.35s cubic-bezier(0.23, 1, 0.32, 1),
-                height 0.35s cubic-bezier(0.23, 1, 0.32, 1),
-                border-color 0.35s ease;
     will-change: transform;
+    transition: opacity 0.3s ease,
+                width  0.4s cubic-bezier(0.23, 1, 0.32, 1),
+                height 0.4s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Spinning conic-gradient border — achieved via pseudo-element */
+.bw-cursor-ring::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        #7c3aed 25%,
+        #a78bfa 50%,
+        #10b981 75%,
+        transparent 100%
+    );
+    animation: cursorRingSpin 2.4s linear infinite;
+    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #fff calc(100% - 2px));
+}
+
+/* Subtle inner glow fill */
+.bw-cursor-ring::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
+    transition: background 0.3s ease;
+}
+
+/* Hover expand — spotlight spotlight */
 .bw-cursor-ring.bw-cursor-expand {
-    width: 56px;
-    height: 56px;
-    border-color: rgba(16, 185, 129, 0.6);
-    background: rgba(16, 185, 129, 0.06);
+    width: 64px;
+    height: 64px;
+}
+
+.bw-cursor-ring.bw-cursor-expand::before {
+    background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        #10b981 30%,
+        #34d399 55%,
+        #7c3aed 80%,
+        transparent 100%
+    );
+    animation-duration: 1.4s;
+}
+
+.bw-cursor-ring.bw-cursor-expand::after {
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, transparent 70%);
+}
+
+/* Text mode ring */
+.bw-cursor-ring.bw-cursor-text-mode {
+    width: 30px;
+    height: 30px;
+    opacity: 0.5;
 }
 
 /* ============================================================
