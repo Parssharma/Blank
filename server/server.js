@@ -7,6 +7,9 @@ import { connectDB } from './config/db.js';
 import authRoutes   from './routes/auth.js';
 import deptRoutes   from './routes/departments.js';
 import reqRoutes    from './routes/requests.js';
+import notifRoutes  from './routes/notifications.js';
+import analyticsRoutes from './routes/analytics.js';
+import financeRoutes  from './routes/finance.js';
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -16,7 +19,7 @@ connectDB();
 
 /* ── Middleware ── */
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
     credentials: true
 }));
 app.use(express.json());
@@ -25,9 +28,12 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 /* ── Routes ── */
-app.use('/api/auth',        authRoutes);
-app.use('/api/departments', deptRoutes);
-app.use('/api/requests',    reqRoutes);
+app.use('/api/auth',          authRoutes);
+app.use('/api/departments',   deptRoutes);
+app.use('/api/requests',      reqRoutes);
+app.use('/api/notifications', notifRoutes);
+app.use('/api/analytics',     analyticsRoutes);
+app.use('/api/finance',       financeRoutes);
 
 /* ── Health check ── */
 app.get('/api/health', (_req, res) =>

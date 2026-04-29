@@ -37,11 +37,71 @@ const budgetRequestSchema = new mongoose.Schema(
             trim: true,
             maxlength: [500, 'Description cannot exceed 500 characters']
         },
+        // Workflow status – use uppercase constants for clarity
         status: {
             type: String,
-            enum: ['pending', 'approved', 'rejected'],
-            default: 'pending'
+            enum: [
+                'PENDING',          // Dept Head submitted
+                'UNDER_REVIEW',    // Finance Officer reviewing
+                'FINANCE_APPROVED',// Passed to Admin
+                'REJECTED',        // Finance or Admin rejected
+                'FINAL_APPROVED',  // Admin final approval
+                'NEEDS_REVISION',  // Finance asks for changes
+                'approved',        // Legacy / admin direct approval
+                'rejected',        // Legacy / admin direct rejection
+                'pending'          // Legacy compatibility
+            ],
+            default: 'PENDING'
         },
+        // Request urgency
+        priority: {
+            type: String,
+            enum: ['low', 'normal', 'urgent'],
+            default: 'normal'
+        },
+        // Compatibility shim – keep older field for any legacy queries (optional)
+        workflowState: {
+            type: String,
+            enum: ['pending_dept_head', 'pending_finance', 'approved', 'rejected'],
+            default: 'pending_dept_head'
+        },
+        // Verification of attached docs by Finance Officer
+        verification: {
+            status: {
+                type: String,
+                enum: ['VERIFIED', 'INCOMPLETE', 'SUSPICIOUS'],
+                default: 'INCOMPLETE'
+            },
+            reviewer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        },
+        // Structured review history (Finance & Admin actions)
+        reviews: [
+            {
+                reviewer: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+                role: { type: String, enum: ['finance', 'admin'] },
+                action: { type: String, enum: ['approved', 'rejected', 'revision_requested'] },
+                comment: { type: String, required: true },
+                timestamp: { type: Date, default: Date.now }
+            }
+        ],
+        institution: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Institution',
+            required: [true, 'Institution context is required']
+        },
+        attachments: [
+            {
+                filename: String,
+                url: String
+            }
+        ],
+        versionHistory: [
+            {
+                modifiedAt: { type: Date, default: Date.now },
+                previousAmount: Number,
+                user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+            }
+        ],
         reviewedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -54,7 +114,25 @@ const budgetRequestSchema = new mongoose.Schema(
         date: {
             type: Date,
             default: Date.now
-        }
+        },
+        comments: [
+            {
+                user: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'User',
+                    required: true
+                },
+                text: {
+                    type: String,
+                    required: true,
+                    trim: true
+                },
+                date: {
+                    type: Date,
+                    default: Date.now
+                }
+            }
+        ]
     },
     {
         timestamps: true,

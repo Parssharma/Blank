@@ -1,4 +1,4 @@
-import { authApi, deptApi, requestApi, isAuthenticated, getUser, setUser, getFiscalYear } from './src/data/api.js';
+import { authApi, deptApi, requestApi, notificationApi, analyticsApi, isAuthenticated, getUser, setUser, getFiscalYear } from './data/api.js';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
@@ -74,6 +74,7 @@ class App {
         this.tableSortAsc = false;
         this.deptSearch   = '';
 
+        window.app = this;
         this.init();
     }
 
@@ -151,6 +152,11 @@ class App {
             authApi.logout();
         });
 
+        /* ── SaaS Features ── */
+        this.initThemeToggle();
+        this.initNotifications();
+        this.initGlobalSearch();
+
         await this.render();
     }
 
@@ -189,6 +195,205 @@ class App {
         if (chevron) chevron.style.transform = '';
     }
 
+    navigateTo(navId, itemId = null) {
+        this.currentNav = navId;
+        this.tableFilter = 'all';
+        this.tableSearch = '';
+        if (itemId) {
+            this.tableSearch = itemId; // Use search/filter to show specific item if possible
+            // Special handling for finance officer navigating to a dept
+            if (navId === 'finance' && this.user.role === 'finance_officer') {
+                // We'll need to pass this to the financeDashboard.js module somehow
+                // For now, setting a global or local storage might work
+                localStorage.setItem('bw_target_dept', itemId);
+            }
+        }
+        this.render();
+        if (window.innerWidth <= 768 && this.sidebarOpen) {
+            this.toggleSidebar();
+        }
+    }
+
+    /* ----------------------------------------------------------
+       SAAS FEATURES (THEME, SEARCH, NOTIFICATIONS)
+    ---------------------------------------------------------- */
+    initThemeToggle() {
+        const toggleBtn = document.getElementById('theme-toggle');
+        const currentTheme = localStorage.getItem('bw_theme') || 'dark';
+        
+        if (currentTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+                const newTheme = isLight ? 'dark' : 'light';
+                if (newTheme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+                localStorage.setItem('bw_theme', newTheme);
+                
+                // Re-render charts to update colors
+                this.render();
+            });
+        }
+    }
+
+    async initNotifications() {
+        const trigger = document.getElementById('notification-trigger');
+        const dropdown = document.getElementById('notification-dropdown');
+        const badge = document.getElementById('notification-badge');
+        
+        this.notifications = [];
+
+        if (trigger && dropdown) {
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdown.classList.toggle('open');
+                this.closeProfileDropdown();
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.classList.remove('open');
+                }
+            });
+
+            document.getElementById('mark-all-read')?.addEventListener('click', async () => {
+                try {
+                    await notificationApi.markAllRead();
+                    this.notifications.forEach(n => n.read = true);
+                    this.updateNotificationUI();
+                } catch (err) {
+                    showToast('Failed to mark all as read', 'error');
+                }
+            });
+        }
+        
+        await this.fetchNotifications();
+    }
+
+    async fetchNotifications() {
+        try {
+            const res = await notificationApi.getAll();
+            if (res.success) {
+                this.notifications = res.data;
+                this.updateNotificationUI();
+            }
+        } catch (err) {
+            console.error('Failed to fetch notifications:', err);
+        }
+    }
+
+    async markNotificationRead(id) {
+        try {
+            await notificationApi.markAsRead(id);
+            const n = this.notifications.find(notif => notif._id === id);
+            if (n) n.read = true;
+            this.updateNotificationUI();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    addNotification(title, message, type = 'info') {
+        // Only used for client-side ephemeral toasts now if needed
+        showToast(message, type);
+    }
+
+    updateNotificationUI() {
+        const list = document.getElementById('notification-list');
+        const badge = document.getElementById('notification-badge');
+        if (!list || !badge) return;
+
+        const unread = this.notifications.filter(n => !n.read).length;
+        if (unread > 0) {
+            badge.style.display = 'flex';
+            badge.textContent = unread;
+        } else {
+            badge.style.display = 'none';
+        }
+
+        if (this.notifications.length === 0) {
+            list.innerHTML = `<div class="empty-state" style="padding: 20px 10px;"><p style="font-size:0.85rem;color:var(--text-muted);">No new notifications</p></div>`;
+            return;
+        }
+
+        list.innerHTML = this.notifications.map((n) => `
+            <div class="notification-item ${n.read ? '' : 'unread'}" onclick="app.markNotificationRead('${n._id}')">
+                <div class="icon">${n.type === 'workflow' ? '✅' : n.type === 'alert' ? '⚠️' : n.type === 'mention' ? '🔔' : '💬'}</div>
+                <div class="content">
+                    <p><strong>${n.title}</strong>: ${n.message}</p>
+                    <span class="time">${new Date(n.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    initGlobalSearch() {
+        const searchInput = document.getElementById('global-search-input');
+        const resultsBox = document.getElementById('global-search-results');
+        
+        if (searchInput && resultsBox) {
+            searchInput.addEventListener('input', async (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                if (query.length < 2) {
+                    resultsBox.innerHTML = '';
+                    return;
+                }
+                
+                resultsBox.innerHTML = '<div style="padding:10px;text-align:center;color:var(--text-muted);font-size:0.8rem;">Searching...</div>';
+                
+                // Fetch data for search (basic client side filter for demo)
+                try {
+                    let resultsHTML = '';
+                    const deptsRes = await deptApi.getAll();
+                    const reqsRes = await requestApi.getAll();
+                    
+                    const depts = deptsRes.data.filter(d => d.name.toLowerCase().includes(query) || d.head.toLowerCase().includes(query));
+                    const reqs = reqsRes.data.filter(r => (r.department?.name || '').toLowerCase().includes(query) || r.category.toLowerCase().includes(query) || r.description.toLowerCase().includes(query));
+                    
+                    if (depts.length > 0) {
+                        resultsHTML += `<div style="padding:8px 14px;background:rgba(255,255,255,0.02);font-weight:bold;font-size:0.75rem;color:var(--text-muted);">DEPARTMENTS</div>`;
+                        depts.slice(0,5).forEach(d => {
+                            const targetNav = this.user.role === 'admin' ? 'depts' : (this.user.role === 'finance_officer' ? 'finance' : 'dash');
+                            resultsHTML += `<div class="search-result-item" onclick="document.getElementById('global-search-input').value='';document.getElementById('global-search-results').innerHTML='';app.navigateTo('${targetNav}', '${d._id}');">
+                                🏢 ${d.name} <span style="float:right;color:var(--text-dim);font-size:0.75rem;">${formatINR(d.budget)}</span>
+                            </div>`;
+                        });
+                    }
+                    if (reqs.length > 0) {
+                        resultsHTML += `<div style="padding:8px 14px;background:rgba(255,255,255,0.02);font-weight:bold;font-size:0.75rem;color:var(--text-muted);">REQUESTS</div>`;
+                        reqs.slice(0,5).forEach(r => {
+                            const targetNav = this.user.role === 'admin' ? 'queue' : (this.user.role === 'finance_officer' ? 'finance' : 'requests');
+                            resultsHTML += `<div class="search-result-item" onclick="document.getElementById('global-search-input').value='';document.getElementById('global-search-results').innerHTML='';app.navigateTo('${targetNav}', '${r._id}');">
+                                📄 ${r.category} <span style="float:right;color:var(--text-dim);font-size:0.75rem;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.department?.name || ''}</span>
+                            </div>`;
+                        });
+                    }
+                    
+                    if (!resultsHTML) {
+                        resultsHTML = '<div style="padding:15px;text-align:center;color:var(--text-muted);font-size:0.85rem;">No results found</div>';
+                    }
+                    resultsBox.innerHTML = resultsHTML;
+                    
+                } catch (err) {
+                    resultsBox.innerHTML = '<div style="padding:15px;text-align:center;color:var(--color-danger);font-size:0.85rem;">Error searching</div>';
+                }
+            });
+            
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.global-search')) {
+                    resultsBox.innerHTML = '';
+                }
+            });
+        }
+    }
+
     /* ----------------------------------------------------------
        MAIN RENDER (async)
     ---------------------------------------------------------- */
@@ -198,11 +403,17 @@ class App {
         /* Update header profile */
         const el = (id) => document.getElementById(id);
         if (el('user-name')) el('user-name').textContent = this.user.name;
-        if (el('user-role')) el('user-role').textContent =
-            this.user.role === 'admin' ? 'Finance Registry' : `Dept Head — ${this.user.department?.name || ''}`;
+        if (el('user-role')) {
+            if (this.user.role === 'admin') el('user-role').textContent = 'Finance Registry';
+            else if (this.user.role === 'finance_officer') el('user-role').textContent = 'Finance Officer';
+            else el('user-role').textContent = `Dept Head — ${this.user.department?.name || ''}`;
+        }
         if (el('dd-user-name')) el('dd-user-name').textContent = this.user.name;
-        if (el('dd-user-role')) el('dd-user-role').textContent =
-            this.user.role === 'admin' ? 'Administrator' : this.user.department?.name || '';
+        if (el('dd-user-role')) {
+            if (this.user.role === 'admin') el('dd-user-role').textContent = 'Administrator';
+            else if (this.user.role === 'finance_officer') el('dd-user-role').textContent = 'Finance Officer';
+            else el('dd-user-role').textContent = this.user.department?.name || '';
+        }
 
         /* Update avatar */
         const avatarImg = document.querySelector('.avatar-ring img');
@@ -214,18 +425,24 @@ class App {
         try {
             if (this.user.role === 'admin') {
                 switch (this.currentNav) {
-                    case 'dash':     await this.renderAdminDashboard(); break;
-                    case 'queue':    await this.renderAdminQueue();     break;
-                    case 'depts':    await this.renderAdminDepts();     break;
-                    case 'reports':  await this.renderAdminReports();   break;
-                    case 'settings': this.renderSettings();            break;
-                    default:         await this.renderAdminDashboard();
+                    case 'dash':      await this.renderAdminDashboard(); break;
+                    case 'queue':     await this.renderAdminQueue();     break;
+                    case 'depts':     await this.renderAdminDepts();     break;
+                    case 'analytics': await this.renderAnalyticsPage();  break;
+                    case 'settings':  this.renderSettings();             break;
+                    default:          await this.renderAdminDashboard();
+                }
+            } else if (this.user.role === 'finance_officer') {
+                switch (this.currentNav) {
+                    case 'finance':   await this.renderDeptDashboard();  break;
+                    case 'analytics': await this.renderAnalyticsPage();  break;
+                    case 'settings':  this.renderSettings();             break;
+                    default:          await this.renderDeptDashboard();
                 }
             } else {
                 switch (this.currentNav) {
                     case 'dash':     await this.renderDeptDashboard(); break;
                     case 'requests': await this.renderDeptRequests();  break;
-                    case 'reports':  await this.renderDeptReports();   break;
                     case 'settings': this.renderSettings();           break;
                     default:         await this.renderDeptDashboard();
                 }
@@ -244,20 +461,29 @@ class App {
        SIDEBAR NAV
     ---------------------------------------------------------- */
     getNavItems() {
-        return this.user.role === 'admin'
-            ? [
-                { id: 'dash',     label: 'Overview',       icon: 'layout-grid'     },
-                { id: 'queue',    label: 'Approval Queue', icon: 'clipboard-check'  },
-                { id: 'depts',    label: 'Departments',    icon: 'building-2'       },
-                { id: 'reports',  label: 'Reports',        icon: 'bar-chart-3'      },
-                { id: 'settings', label: 'Settings',       icon: 'settings'         }
-              ]
-            : [
-                { id: 'dash',     label: 'Overview',       icon: 'layout-grid' },
-                { id: 'requests', label: 'My Requests',    icon: 'file-text'   },
-                { id: 'reports',  label: 'Reports',        icon: 'bar-chart-3' },
-                { id: 'settings', label: 'Settings',       icon: 'settings'    }
-              ];
+        if (this.user.role === 'admin') {
+            return [
+                { id: 'dash',      label: 'Overview',       icon: 'layout-grid'     },
+                { id: 'queue',     label: 'Approval Queue', icon: 'clipboard-check'  },
+                { id: 'depts',     label: 'Departments',    icon: 'building-2'       },
+                { id: 'analytics', label: 'Analytics',      icon: 'brain'            },
+                { id: 'settings',  label: 'Settings',       icon: 'settings'         }
+            ];
+        }
+        if (this.user.role === 'finance_officer') {
+            return [
+                { id: 'finance',   label: 'Finance Review', icon: 'clipboard-check' },
+                { id: 'analytics', label: 'Analytics',      icon: 'brain'           },
+                { id: 'settings',  label: 'Settings',       icon: 'settings'        }
+            ];
+        }
+        // Department Head default
+        return [
+            { id: 'dash',     label: 'Overview',       icon: 'layout-grid' },
+            { id: 'requests', label: 'My Requests',    icon: 'file-text'   },
+            { id: 'reports',  label: 'Reports',        icon: 'bar-chart-3' },
+            { id: 'settings', label: 'Settings',       icon: 'settings'    }
+        ];
     }
 
     renderSidebarNav() {
@@ -308,14 +534,39 @@ class App {
        DEPT DASHBOARD
     ---------------------------------------------------------- */
     async renderDeptDashboard() {
-        this.titleEl.textContent = 'Department Overview';
-        this.renderSkeleton();
-
         const deptId  = this.user.department?._id;
-        if (!deptId) {
-            this.content.innerHTML = `<div class="glass-panel" style="padding:40px;text-align:center;"><p style="color:var(--text-muted);">No department assigned to your account. Contact an administrator.</p></div>`;
+        // If the user is a Department Head without a department, show warning.
+        // Finance Officers do NOT require a department – they get a dedicated finance view.
+        if (!deptId && this.user.role !== 'finance_officer') {
+            this.content.innerHTML = `<div class="glass-panel" style="padding:40px;text-align:center;">
+                <p style="color:var(--text-muted);">No department assigned to your account. Contact an administrator.</p>
+            </div>`;
             return;
         }
+        // Finance Officer – render the finance dashboard (separate UI)
+        if (this.user.role === 'finance_officer') {
+            // Simple client‑side fetch of finance.html and inject into content area
+            fetch('/finance.html')
+                .then(res => res.text())
+                .then(async (html) => {
+                    this.content.innerHTML = html;
+                    try {
+                        const { initFinanceDashboard } = await import('./modules/financeDashboard.js');
+                        await initFinanceDashboard();
+                    } catch (err) {
+                        console.error('Finance dashboard init error:', err);
+                        showToast('Failed to initialize finance dashboard logic', 'error');
+                    }
+                })
+                .catch(err => {
+                    console.error('Finance dashboard load error:', err);
+                    this.content.innerHTML = `<div class="glass-panel" style="padding:40px;text-align:center;"><p style="color:var(--color-danger);">Failed to load finance dashboard.</p></div>`;
+                });
+            return;
+        }
+        // Existing Department dashboard logic continues...
+        this.titleEl.textContent = 'Department Overview';
+        this.renderSkeleton();
 
         /* Parallel fetch */
         const [statsRes, reqsRes, insightsRes] = await Promise.all([
@@ -329,6 +580,14 @@ class App {
         const insights = insightsRes.data;
         const usedPct  = stats.utilizationPct ?? 0;
         const remPct   = 100 - usedPct;
+
+        // Smart Insights Generation
+        const smartInsights = [];
+        if (usedPct > 85) smartInsights.push({ type: 'error', icon: 'alert-triangle', text: `Critical: Budget is nearly depleted (${usedPct}% used). Immediate action required.` });
+        else if (usedPct > 60) smartInsights.push({ type: 'warning', icon: 'alert-circle', text: `Warning: Spending is accelerating. You have ${remPct}% of budget remaining.` });
+        else smartInsights.push({ type: 'success', icon: 'check-circle', text: `Healthy: Your budget utilization is on track.` });
+
+        if (stats.pending > 0) smartInsights.push({ type: 'info', icon: 'info', text: `You have ${formatINR(stats.pending)} in pending requests.` });
 
         this.content.innerHTML = `
             <div class="dashboard-grid">
@@ -370,7 +629,14 @@ class App {
                 </div>
             </div>
 
-            ${this.renderInsightsBar(insights)}
+            <div class="insights-bar">
+                ${smartInsights.map(insight => `
+                    <div class="insight-chip ${insight.type === 'error' ? 'warning' : insight.type === 'warning' ? 'warning' : insight.type === 'success' ? 'success' : ''}">
+                        <i data-lucide="${insight.icon}" class="chip-icon"></i>
+                        <span>${insight.text}</span>
+                    </div>
+                `).join('')}
+            </div>
 
             <div class="content-grid">
                 <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.25s both;">
@@ -391,6 +657,21 @@ class App {
                             <span class="center-value">${usedPct}%</span>
                             <div class="center-sub">spent</div>
                         </div>
+                    </div>
+                </div>
+                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.35s both;">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Category Limits</h3>
+                    <div style="display:flex;flex-direction:column;gap:16px;max-height: 250px;overflow-y:auto;padding-right:10px;">
+                        ${(stats.categoryLimits && stats.categoryLimits.length > 0) ? stats.categoryLimits.map(c => {
+                            const p = c.limit > 0 ? Math.min(Math.round((c.spent / c.limit) * 100), 100) : 0;
+                            return `<div style="font-size:0.85rem;">
+                                <div style="display:flex;justify-content:space-between;margin-bottom:6px;align-items:center;">
+                                    <span style="font-weight:600;">${c.category}</span>
+                                    <span style="color:var(--text-muted);font-size:0.75rem;">${formatINR(c.spent)} / ${formatINR(c.limit)}</span>
+                                </div>
+                                <div class="stat-progress" style="height:6px;background:rgba(255,255,255,0.05);"><div class="stat-progress-fill ${progressClass(p)}" style="width:${p}%;"></div></div>
+                            </div>`;
+                        }).join('') : '<p style="color:var(--text-muted);font-size:0.85rem;">No category limits defined.</p>'}
                     </div>
                 </div>
             </div>`;
@@ -419,6 +700,17 @@ class App {
         const totalBudget = depts.reduce((s, d) => s + d.budget, 0);
         const totalSpent  = depts.reduce((s, d) => s + d.spent,  0);
         const burnPct     = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
+
+        // Smart Insights Generation
+        const smartInsights = [];
+        if (burnPct > 80) smartInsights.push({ type: 'error', icon: 'alert-triangle', text: `Institutional burn rate is critical at ${burnPct}%.` });
+        else if (burnPct > 50) smartInsights.push({ type: 'warning', icon: 'alert-circle', text: `Burn rate is healthy at ${burnPct}%.` });
+        else smartInsights.push({ type: 'success', icon: 'check-circle', text: `Sufficient reserves remaining (${100 - burnPct}%).` });
+
+        if (pending.length > 0) smartInsights.push({ type: 'info', icon: 'clock', text: `${pending.length} requests await your approval.` });
+
+        const topSpender = [...depts].sort((a,b) => b.spent - a.spent)[0];
+        if (topSpender) smartInsights.push({ type: 'info', icon: 'trending-up', text: `Highest spender: ${topSpender.name} (${formatINR(topSpender.spent)})` });
 
         this.content.innerHTML = `
             <div class="dashboard-grid">
@@ -451,7 +743,14 @@ class App {
                 </div>
             </div>
 
-            ${this.renderInsightsBar(insights)}
+            <div class="insights-bar">
+                ${smartInsights.map(insight => `
+                    <div class="insight-chip ${insight.type === 'error' ? 'warning' : insight.type === 'warning' ? 'warning' : insight.type === 'success' ? 'success' : ''}">
+                        <i data-lucide="${insight.icon}" class="chip-icon"></i>
+                        <span>${insight.text}</span>
+                    </div>
+                `).join('')}
+            </div>
 
             <div class="content-grid">
                 <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.25s both;">
@@ -850,12 +1149,15 @@ class App {
                     <i data-lucide="search" style="width:15px;height:15px;color:var(--text-muted);flex-shrink:0;"></i>
                     <input type="text" id="${tableId}-search" placeholder="Search category, description…" value="${this.tableSearch}" />
                 </div>
-                <div class="filter-tabs">
+                <div class="filter-tabs" style="flex:1;">
                     ${['all','approved','pending','rejected'].map(f => `
                         <button class="filter-tab ${this.tableFilter === f ? (f==='all'?'active':`active-${f}`) : ''}" data-filter="${f}" id="${tableId}-filter-${f}">
                             ${f === 'all' ? 'All' : f.charAt(0).toUpperCase()+f.slice(1)}
                         </button>`).join('')}
                 </div>
+                <button class="btn btn-ghost btn-sm" id="${tableId}-export-btn">
+                    <i data-lucide="download" style="width:14px;height:14px;"></i>Export CSV
+                </button>
             </div>`;
     }
 
@@ -898,7 +1200,7 @@ class App {
                 </tr></thead>
                 <tbody>
                     ${filtered.map(r => `
-                        <tr>
+                        <tr style="cursor:pointer;" onclick="app.showRequestDetails('${r._id}')">
                             <td style="color:var(--text-muted);white-space:nowrap;">${new Date(r.date).toLocaleDateString('en-IN')}</td>
                             <td style="font-weight:600;">${r.category}</td>
                             <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-sub);">${r.description}</td>
@@ -933,6 +1235,45 @@ class App {
             };
         });
         this.reattachSortHandlers(allRequests, tableId, wrapperId);
+        
+        const exportBtn = document.getElementById(`${tableId}-export-btn`);
+        if (exportBtn) {
+            exportBtn.onclick = () => this.exportTableToCSV(allRequests);
+        }
+    }
+
+    exportTableToCSV(allRequests) {
+        let filtered = allRequests.filter(r => {
+            if (this.tableFilter !== 'all' && r.status !== this.tableFilter) return false;
+            if (this.tableSearch) {
+                const q = this.tableSearch.toLowerCase();
+                return r.category.toLowerCase().includes(q) || r.description.toLowerCase().includes(q);
+            }
+            return true;
+        });
+
+        const headers = ['Date', 'Department', 'Category', 'Description', 'Amount', 'Status', 'Submitted By'];
+        const rows = filtered.map(r => [
+            new Date(r.date).toLocaleDateString('en-IN'),
+            `"${r.department?.name || 'Unknown'}"`,
+            `"${r.category}"`,
+            `"${(r.description || '').replace(/"/g, '""')}"`,
+            r.amount,
+            r.status,
+            `"${r.submittedBy?.name || 'Unknown'}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + [headers.join(','), ...rows.map(e => e.join(','))].join("\\n");
+            
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `budget_requests_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('Export successful', 'success');
     }
 
     reattachSortHandlers(allRequests, tableId, wrapperId) {
@@ -1032,6 +1373,14 @@ class App {
                         </select>
                     </div>
                     <div class="form-group">
+                        <label class="form-label">Priority</label>
+                        <select id="req-priority" class="form-input" style="background:rgba(255,255,255,0.05);border:1px solid var(--card-border);color:white;padding:11px 14px;border-radius:var(--radius-md);width:100%;font-family:Outfit,sans-serif;font-size:0.9rem;">
+                            <option value="low">🟢 Low</option>
+                            <option value="normal" selected>🟡 Normal</option>
+                            <option value="urgent">🔴 Urgent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label class="form-label">Amount (₹)</label>
                         <input type="number" id="req-amount" required class="form-input" placeholder="e.g. 50000" min="1" />
                     </div>
@@ -1064,7 +1413,8 @@ class App {
                 await requestApi.create({
                     amount,
                     category:    document.getElementById('req-cat').value,
-                    description: document.getElementById('req-desc').value
+                    description: document.getElementById('req-desc').value,
+                    priority:    document.getElementById('req-priority').value
                 });
                 closeModal();
                 showToast('Budget request submitted successfully!', 'success');
@@ -1299,6 +1649,488 @@ class App {
                 lucide.createIcons();
             }
         };
+    }
+
+    async showRequestDetails(id) {
+        try {
+            const res = await requestApi.getById(id);
+            const reqData = res.data;
+
+            const modal = document.getElementById('modal-container');
+            modal.style.display = 'flex';
+            
+            const commentsHtml = (reqData.comments || []).map(c => `
+                <div class="comment">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.avatar || c.user?.name}" class="comment-avatar" />
+                    <div class="comment-body">
+                        <div class="comment-header">
+                            <strong>${c.user?.name || 'Unknown'}</strong>
+                            <span>${new Date(c.createdAt).toLocaleString('en-IN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                        </div>
+                        <div class="comment-text">${c.text}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            const versionHtml = (reqData.versionHistory && reqData.versionHistory.length > 0) ? `
+                <div style="margin-bottom:24px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                    <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:8px;color:var(--text-muted);">Version History</h4>
+                    ${reqData.versionHistory.map(v => `
+                        <div style="font-size:0.8rem;margin-bottom:4px;">
+                            &bull; Amount changed from <strong>${formatINR(v.previousAmount)}</strong> by ${v.user?.name || 'Unknown'} on ${new Date(v.modifiedAt).toLocaleString('en-IN')}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '';
+
+            const isDeptHead = this.user.role === 'dept';
+            const isFinance = this.user.role === 'finance_officer';
+            const isAdmin = this.user.role === 'admin';
+            
+            let canApprove = false;
+            if (reqData.status === 'pending') {
+                if (reqData.workflowState === 'pending_dept_head' && (isDeptHead || isAdmin)) canApprove = true;
+                if (reqData.workflowState === 'pending_finance' && (isFinance || isAdmin)) canApprove = true;
+            }
+
+            const actionsHtml = canApprove ? `
+                <div style="display:flex;gap:10px;margin-top:20px;padding-top:20px;border-top:1px solid var(--card-border);">
+                    <button class="btn btn-success approve-btn" data-id="${reqData._id}" style="flex:1;">
+                        <i data-lucide="check" style="width:14px;height:14px;"></i>${reqData.workflowState === 'pending_dept_head' ? 'Approve & Forward to Finance' : 'Final Approve'}
+                    </button>
+                    <button class="btn btn-danger reject-btn" data-id="${reqData._id}" style="flex:1;">
+                        <i data-lucide="x" style="width:14px;height:14px;"></i>Reject
+                    </button>
+                </div>
+            ` : '';
+
+            modal.innerHTML = `
+                <div class="glass-panel modal-content" style="width:600px;padding:32px;border-color:var(--color-primary-border);max-height:90vh;overflow-y:auto;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
+                        <div>
+                            <h2 style="font-weight:700;font-size:1.2rem;margin-bottom:4px;">${reqData.category}</h2>
+                            <p style="font-size:0.85rem;color:var(--text-muted);">${reqData.department?.name || 'Unknown Dept'} &bull; ${formatINR(reqData.amount)}</p>
+                        </div>
+                        <button class="btn btn-ghost btn-sm" id="close-req-details" style="width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;">
+                            <i data-lucide="x" style="width:16px;height:16px;"></i>
+                        </button>
+                    </div>
+
+                    <p style="font-size:0.9rem;color:var(--text-main);line-height:1.6;margin-bottom:24px;">
+                        ${reqData.description}
+                    </p>
+
+                    ${versionHtml}
+
+                    <h3 style="font-size:0.95rem;font-weight:600;margin-bottom:16px;">Request Lifecycle</h3>
+                    <div class="timeline">
+                        <div class="timeline-item completed">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h4>Submitted</h4>
+                                <p>By ${reqData.submittedBy?.name || 'Unknown'}</p>
+                                <div class="timeline-date">${new Date(reqData.date).toLocaleString('en-IN')}</div>
+                            </div>
+                        </div>
+                        ${reqData.status === 'approved' ? `
+                        <div class="timeline-item completed">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content">
+                                <h4>Approved</h4>
+                                <p>By ${reqData.reviewedBy?.name || 'Admin/Finance'}</p>
+                            </div>
+                        </div>
+                        ` : reqData.status === 'rejected' ? `
+                        <div class="timeline-item rejected">
+                            <div class="timeline-marker"></div>
+                            <div class="timeline-content" style="border-color:var(--color-danger-border);">
+                                <h4 style="color:var(--color-danger);">Rejected</h4>
+                                <p>By ${reqData.reviewedBy?.name || 'Admin/Finance'}</p>
+                            </div>
+                        </div>
+                        ` : `
+                            ${reqData.workflowState === 'pending_finance' ? `
+                            <div class="timeline-item completed">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <h4>Dept Head Approved</h4>
+                                    <p>Forwarded to Finance</p>
+                                </div>
+                            </div>
+                            <div class="timeline-item current">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content" style="border-color:var(--color-primary-border);">
+                                    <h4 style="color:var(--color-primary-light);">Under Final Review</h4>
+                                    <p>Awaiting Finance Officer</p>
+                                </div>
+                            </div>
+                            ` : `
+                            <div class="timeline-item current">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content" style="border-color:var(--color-primary-border);">
+                                    <h4 style="color:var(--color-primary-light);">Under Review</h4>
+                                    <p>Awaiting Dept Head Approval</p>
+                                </div>
+                            </div>
+                            `}
+                        `}
+                    </div>
+
+                    <div class="comments-section">
+                        <h3 style="font-size:0.95rem;font-weight:600;margin-bottom:16px;">Discussion</h3>
+                        <div id="comments-container">
+                            ${commentsHtml || '<p style="color:var(--text-muted);font-size:0.85rem;">No comments yet.</p>'}
+                        </div>
+                        
+                        <div class="comment-input-area">
+                            <input type="text" id="new-comment-input" placeholder="Add a comment..." style="width:100%;" />
+                            <button class="btn btn-primary btn-sm" id="add-comment-btn">Post</button>
+                        </div>
+                    </div>
+
+                    ${actionsHtml}
+                </div>`;
+            lucide.createIcons();
+
+            const closeModal = () => { modal.style.display = 'none'; };
+            document.getElementById('close-req-details').onclick = closeModal;
+            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+            // Add Comment
+            document.getElementById('add-comment-btn').onclick = async () => {
+                const input = document.getElementById('new-comment-input');
+                const text = input.value.trim();
+                if (!text) return;
+                try {
+                    await requestApi.addComment(reqData._id, text);
+                    input.value = '';
+                    this.showRequestDetails(reqData._id); // Re-render modal to show new comment
+                    this.render(); // Update underlying table if needed
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            };
+
+            // Action Handlers
+            if (canApprove) {
+                modal.querySelector('.approve-btn').onclick = async () => {
+                    try {
+                        await requestApi.updateStatus(reqData._id, 'approved');
+                        showToast('Request moved to next stage successfully', 'success');
+                        closeModal();
+                        await this.render();
+                    } catch (err) { showToast(err.message, 'error'); }
+                };
+                modal.querySelector('.reject-btn').onclick = async () => {
+                    try {
+                        await requestApi.updateStatus(reqData._id, 'rejected');
+                        showToast('Request rejected', 'error');
+                        closeModal();
+                        await this.render();
+                    } catch (err) { showToast(err.message, 'error'); }
+                };
+            }
+
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
+
+    /* ----------------------------------------------------------
+       ANALYTICS PAGE (Forecast + Insights + Comparative)
+    ---------------------------------------------------------- */
+    async renderAnalyticsPage() {
+        this.titleEl.textContent = 'Analytics & Insights';
+        this.renderSkeleton();
+
+        /* Parallel fetch — all 3 endpoints */
+        const [forecastRes, insightsRes, compRes] = await Promise.all([
+            analyticsApi.getForecast().catch(() => ({ success: false, data: { forecast: [] } })),
+            analyticsApi.getInsights().catch(() => ({ success: false, data: { insights: [], recommendations: [] } })),
+            analyticsApi.getComparative().catch(() => ({ success: false, data: { departments: [], categoryBreakdown: [] } }))
+        ]);
+
+        const forecast       = forecastRes?.data || {};
+        const insights       = insightsRes?.data || {};
+        const comparative    = compRes?.data || {};
+        const forecastData   = forecast.forecast || [];
+        const historical     = forecast.historical || [];
+        const insightsList   = insights.insights || [];
+        const recommendations= insights.recommendations || [];
+        const depts          = comparative.departments || [];
+        const catBreakdown   = comparative.categoryBreakdown || [];
+
+        /* Insight type → icon + color */
+        const insightIcon = (text) => {
+            if (text.includes('Anomaly'))  return { icon: 'alert-triangle', cls: 'warning' };
+            if (text.includes('Warning'))  return { icon: 'alert-circle',   cls: 'warning' };
+            if (text.includes('Good'))     return { icon: 'check-circle',   cls: 'success' };
+            return { icon: 'info', cls: '' };
+        };
+        const recIcon = (type) => {
+            if (type === 'critical') return { icon: 'alert-triangle', cls: 'warning' };
+            if (type === 'warning')  return { icon: 'alert-circle',   cls: 'warning' };
+            return { icon: 'lightbulb', cls: 'success' };
+        };
+
+        this.content.innerHTML = `
+            <!-- KPI Row -->
+            <div class="dashboard-grid">
+                <div class="glass-panel stat-card primary">
+                    <div class="stat-icon" style="background:rgba(124,58,237,0.15);">
+                        <i data-lucide="brain" style="width:18px;height:18px;color:var(--color-primary-light);"></i>
+                    </div>
+                    <span class="stat-label">Avg. Spend</span>
+                    <span class="stat-value">${formatINR(insights.mean || 0)}</span>
+                    <span class="stat-sub">Per approved request</span>
+                </div>
+                <div class="glass-panel stat-card secondary">
+                    <div class="stat-icon" style="background:var(--color-warning-bg);">
+                        <i data-lucide="activity" style="width:18px;height:18px;color:var(--color-warning);"></i>
+                    </div>
+                    <span class="stat-label">Std Deviation</span>
+                    <span class="stat-value text-warning">${formatINR(insights.stdDev || 0)}</span>
+                    <span class="stat-sub">Spending volatility</span>
+                </div>
+                <div class="glass-panel stat-card secondary">
+                    <div class="stat-icon" style="background:rgba(59,130,246,0.1);">
+                        <i data-lucide="trending-up" style="width:18px;height:18px;color:var(--color-info);"></i>
+                    </div>
+                    <span class="stat-label">Trend</span>
+                    <span class="stat-value text-primary" style="font-size:1.2rem;">${forecast.trend === 'increasing' ? '📈 Increasing' : '📉 Decreasing'}</span>
+                    <span class="stat-sub">6-month projection</span>
+                </div>
+                <div class="glass-panel stat-card secondary">
+                    <div class="stat-icon" style="background:var(--color-success-bg);">
+                        <i data-lucide="building-2" style="width:18px;height:18px;color:var(--color-success);"></i>
+                    </div>
+                    <span class="stat-label">Departments</span>
+                    <span class="stat-value text-success">${depts.length}</span>
+                    <span class="stat-sub">Tracked in system</span>
+                </div>
+            </div>
+
+            <!-- Insights Bar -->
+            ${insightsList.length > 0 ? `
+            <div class="insights-bar">
+                ${insightsList.map(text => {
+                    const { icon, cls } = insightIcon(text);
+                    return `<div class="insight-chip ${cls}">
+                        <i data-lucide="${icon}" class="chip-icon"></i>
+                        <span>${text}</span>
+                    </div>`;
+                }).join('')}
+            </div>` : ''}
+
+            <!-- Main Grid -->
+            <div class="content-grid">
+                <!-- Forecast Chart -->
+                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.2s both;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <h3 style="font-weight:700;font-size:1rem;">Spending Forecast</h3>
+                        <button class="btn btn-primary btn-sm" id="download-report-btn">
+                            <i data-lucide="download" style="width:14px;height:14px;"></i>Download CSV
+                        </button>
+                    </div>
+                    <canvas id="forecast-chart" style="max-height:320px;"></canvas>
+                    ${forecastData.length === 0 && historical.length === 0 ? '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;margin-top:16px;">Not enough historical data to generate forecast.</p>' : ''}
+                </div>
+
+                <!-- Dept Comparison -->
+                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.3s both;">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Department Comparison</h3>
+                    <canvas id="dept-comparison-chart" style="max-height:320px;"></canvas>
+                    ${depts.length === 0 ? '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;margin-top:16px;">No department data available.</p>' : ''}
+                </div>
+
+                <!-- Category Breakdown -->
+                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.35s both;">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Category Breakdown</h3>
+                    <canvas id="category-breakdown-chart" style="max-height:280px;"></canvas>
+                    ${catBreakdown.length === 0 ? '<p style="color:var(--text-muted);font-size:0.85rem;text-align:center;margin-top:16px;">No category data available.</p>' : ''}
+                </div>
+
+                <!-- Smart Recommendations -->
+                <div class="glass-panel" style="padding:28px;animation:fadeSlideUp 0.5s ease 0.4s both;">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">
+                        <i data-lucide="lightbulb" style="width:16px;height:16px;display:inline;vertical-align:-3px;margin-right:6px;color:var(--color-warning);"></i>Smart Recommendations
+                    </h3>
+                    ${recommendations.length > 0 ? `
+                    <div style="display:flex;flex-direction:column;gap:12px;">
+                        ${recommendations.map(r => {
+                            const { icon, cls } = recIcon(r.type);
+                            return `<div class="insight-chip ${cls}" style="padding:14px 18px;">
+                                <i data-lucide="${icon}" class="chip-icon"></i>
+                                <span style="font-size:0.85rem;line-height:1.5;">${r.text}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>` : '<p style="color:var(--text-muted);font-size:0.85rem;">All departments are within optimal ranges.</p>'}
+                </div>
+
+                <!-- Department Utilization Table -->
+                <div class="glass-panel" style="padding:28px;grid-column:1/-1;animation:fadeSlideUp 0.5s ease 0.45s both;">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:20px;">Department Utilization</h3>
+                    ${depts.length > 0 ? `
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Budget</th>
+                                    <th>Spent</th>
+                                    <th>Remaining</th>
+                                    <th>Utilization</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${depts.map(d => `
+                                <tr>
+                                    <td style="font-weight:600;">${d.name}</td>
+                                    <td>${formatINR(d.budget)}</td>
+                                    <td>${formatINR(d.spent)}</td>
+                                    <td>${formatINR(d.remaining)}</td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div class="stat-progress" style="flex:1;height:6px;">
+                                                <div class="stat-progress-fill ${progressClass(d.utilization)}" style="width:${d.utilization}%;"></div>
+                                            </div>
+                                            <span style="font-size:0.8rem;font-weight:600;color:${d.utilization > 80 ? 'var(--color-danger)' : d.utilization > 50 ? 'var(--color-warning)' : 'var(--color-success)'};">${d.utilization}%</span>
+                                        </div>
+                                    </td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : '<p style="color:var(--text-muted);font-size:0.85rem;">No departments found.</p>'}
+                </div>
+            </div>`;
+
+        /* ── Charts ── */
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+        const labelColor = isDark ? '#aaa' : '#555';
+
+        // Forecast Chart
+        if (historical.length > 0 || forecastData.length > 0) {
+            destroyChart('forecast-chart');
+            const histLabels = historical.map(h => h.label);
+            const histValues = historical.map(h => h.y);
+            const fcLabels  = forecastData.map(f => f.month);
+            const fcValues  = forecastData.map(f => f.projectedAmount);
+            const allLabels = [...histLabels, ...fcLabels];
+            const histFull  = [...histValues, ...Array(fcLabels.length).fill(null)];
+            const fcFull    = [...Array(histLabels.length > 0 ? histLabels.length - 1 : 0).fill(null), histValues[histValues.length - 1] || null, ...fcValues];
+
+            new Chart(document.getElementById('forecast-chart'), {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: 'Historical Spending',
+                            data: histFull,
+                            borderColor: '#7C3AED',
+                            backgroundColor: 'rgba(124,58,237,0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#7C3AED'
+                        },
+                        {
+                            label: 'Projected (6 months)',
+                            data: fcFull,
+                            borderColor: '#06B6D4',
+                            backgroundColor: 'rgba(6,182,212,0.08)',
+                            fill: true,
+                            borderDash: [8, 4],
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#06B6D4'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: labelColor } } },
+                    scales: {
+                        x: { ticks: { color: labelColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: labelColor, callback: v => formatINR(v) }, grid: { color: gridColor } }
+                    }
+                }
+            });
+        }
+
+        // Department Comparison Chart
+        if (depts.length > 0) {
+            destroyChart('dept-comparison-chart');
+            const palette = ['#7C3AED', '#06B6D4', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+            new Chart(document.getElementById('dept-comparison-chart'), {
+                type: 'bar',
+                data: {
+                    labels: depts.map(d => d.name),
+                    datasets: [
+                        {
+                            label: 'Budget',
+                            data: depts.map(d => d.budget),
+                            backgroundColor: depts.map((_, i) => palette[i % palette.length] + '33'),
+                            borderColor: depts.map((_, i) => palette[i % palette.length]),
+                            borderWidth: 2,
+                            borderRadius: 6
+                        },
+                        {
+                            label: 'Spent',
+                            data: depts.map(d => d.spent),
+                            backgroundColor: depts.map((_, i) => palette[i % palette.length] + 'AA'),
+                            borderColor: depts.map((_, i) => palette[i % palette.length]),
+                            borderWidth: 2,
+                            borderRadius: 6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: labelColor } } },
+                    scales: {
+                        x: { ticks: { color: labelColor }, grid: { color: gridColor } },
+                        y: { ticks: { color: labelColor, callback: v => formatINR(v) }, grid: { color: gridColor } }
+                    }
+                }
+            });
+        }
+
+        // Category Breakdown Doughnut
+        if (catBreakdown.length > 0) {
+            destroyChart('category-breakdown-chart');
+            const catPalette = ['#7C3AED', '#06B6D4', '#F59E0B', '#10B981', '#EF4444', '#EC4899'];
+            new Chart(document.getElementById('category-breakdown-chart'), {
+                type: 'doughnut',
+                data: {
+                    labels: catBreakdown.map(c => c._id),
+                    datasets: [{
+                        data: catBreakdown.map(c => c.total),
+                        backgroundColor: catBreakdown.map((_, i) => catPalette[i % catPalette.length] + 'CC'),
+                        borderColor: catBreakdown.map((_, i) => catPalette[i % catPalette.length]),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutout: '60%',
+                    plugins: {
+                        legend: { position: 'right', labels: { color: labelColor, padding: 16, font: { size: 12 } } }
+                    }
+                }
+            });
+        }
+
+        /* Download button */
+        document.getElementById('download-report-btn')?.addEventListener('click', async () => {
+            try {
+                await analyticsApi.downloadReport();
+                showToast('Report downloaded', 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
     }
 }
 

@@ -7,7 +7,8 @@ import {
     createRequest,
     updateRequestStatus,
     updateRequest,
-    deleteRequest
+    deleteRequest,
+    addComment
 } from '../controllers/requestController.js';
 import { protect, authorize } from '../middleware/auth.js';
 
@@ -30,5 +31,6 @@ router.route('/:id')
     .delete(deleteRequest);
 
 router.put('/:id/status', authorize('admin'), updateRequestStatus);
+router.post('/:id/comments', addComment);
 
 export default router;

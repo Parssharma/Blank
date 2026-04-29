@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import Department from '../models/Department.js';
+import Institution from '../models/Institution.js';
 
 /* ── Helper: sign token + send response ── */
 const sendToken = (user, statusCode, res) => {
@@ -33,12 +35,25 @@ export const register = async (req, res) => {
             return res.status(409).json({ success: false, message: 'An account with that email already exists' });
         }
 
+        // Fallback to a default institution if this is a public registration
+        let instId = req.body.institution || (req.user ? req.user.institution : null);
+        if (!instId) {
+            const mongoose = await import('mongoose');
+            const Institution = mongoose.model('Institution');
+            let defaultInst = await Institution.findOne({ domain: 'globaltech.edu' });
+            if (!defaultInst) {
+                defaultInst = await Institution.findOne(); // grab any available
+            }
+            if (defaultInst) instId = defaultInst._id;
+        }
+
         const user = await User.create({
             name,
             email,
             password,
             role: role || 'dept',
             department: department || null,
+            institution: instId,
             avatar: avatar || 'Lucky'
         });
 

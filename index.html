@@ -12,7 +12,7 @@
             window.location.href = '/login.html';
         }
     </script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/src/styles/main.css">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -43,24 +43,56 @@
             <!-- Header -->
             <header id="app-header">
                 <div style="display:flex;align-items:center;gap:14px;">
-                    <button id="sidebar-toggle" aria-label="Toggle sidebar">
-                        <i data-lucide="panel-left-close" style="width:16px;height:16px;"></i>
+                    <button id="sidebar-toggle" aria-label="Toggle sidebar" class="icon-btn">
+                        <i data-lucide="panel-left-close"></i>
                     </button>
                     <div id="page-title">
                         <h1 style="font-size:1.4rem;font-weight:700;" id="current-title">Dashboard</h1>
                     </div>
                 </div>
 
-                <!-- Profile -->
-                <div class="user-profile" id="profile-trigger">
-                    <div style="text-align:right;">
-                        <p style="font-size:0.88rem;font-weight:600;" id="user-name">Loading...</p>
-                        <p style="font-size:0.72rem;color:var(--text-muted);" id="user-role">—</p>
+                <div class="header-actions">
+                    <!-- Global Search -->
+                    <div class="global-search">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="global-search-input" placeholder="Search departments, requests..." autocomplete="off" />
+                        <div class="search-results-dropdown" id="global-search-results"></div>
                     </div>
-                    <div class="avatar-ring">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" alt="User avatar" />
+
+                    <!-- Dark Mode Toggle -->
+                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle dark mode">
+                        <i data-lucide="moon"></i>
+                    </button>
+
+                    <!-- Notifications -->
+                    <div class="notification-wrapper">
+                        <button id="notification-trigger" class="icon-btn" aria-label="Notifications">
+                            <i data-lucide="bell"></i>
+                            <span class="notification-badge" id="notification-badge" style="display:none;">0</span>
+                        </button>
+                        <div class="notification-dropdown" id="notification-dropdown">
+                            <div class="dropdown-header" style="justify-content:space-between;display:flex;">
+                                <p style="font-weight:600;font-size:0.9rem;">Notifications</p>
+                                <span style="font-size:0.75rem;color:var(--color-primary);cursor:pointer;" id="mark-all-read">Mark all as read</span>
+                            </div>
+                            <div class="notification-list" id="notification-list">
+                                <div class="empty-state" style="padding: 20px 10px;">
+                                    <p style="font-size:0.85rem;color:var(--text-muted);">No new notifications</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text-muted);transition:transform 0.2s;" id="profile-chevron"></i>
+
+                    <!-- Profile -->
+                    <div class="user-profile" id="profile-trigger">
+                        <div style="text-align:right;" class="profile-info-text">
+                            <p style="font-size:0.88rem;font-weight:600;" id="user-name">Loading...</p>
+                            <p style="font-size:0.72rem;color:var(--text-muted);" id="user-role">—</p>
+                        </div>
+                        <div class="avatar-ring">
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Lucky" alt="User avatar" />
+                        </div>
+                        <i data-lucide="chevron-down" style="width:14px;height:14px;color:var(--text-muted);transition:transform 0.2s;" id="profile-chevron"></i>
 
                     <!-- Dropdown -->
                     <div class="profile-dropdown" id="profile-dropdown">
@@ -78,6 +110,7 @@
                             <span>Logout</span>
                         </div>
                     </div>
+                    </div>
                 </div>
             </header>
 
@@ -94,6 +127,6 @@
     <!-- Modal Container -->
     <div id="modal-container"></div>
 
-    <script type="module" src="/main.js"></script>
+    <script type="module" src="/src/app.js"></script>
 </body>
 </html>

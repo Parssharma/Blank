@@ -9,13 +9,15 @@ import User from '../models/User.js';
 export const getAllDepts = async (req, res) => {
     try {
         let depts;
-        if (req.user.role === 'admin') {
-            depts = await Department.find().sort('name');
+        const institutionId = req.user.institution._id;
+
+        if (req.user.role === 'admin' || req.user.role === 'finance_officer') {
+            depts = await Department.find({ institution: institutionId }).sort('name');
         } else {
             if (!req.user.department) {
                 return res.status(400).json({ success: false, message: 'No department assigned to this user' });
             }
-            depts = await Department.find({ _id: req.user.department._id });
+            depts = await Department.find({ _id: req.user.department._id, institution: institutionId });
         }
         res.json({ success: true, count: depts.length, data: depts });
     } catch (err) {
@@ -28,11 +30,18 @@ export const getAllDepts = async (req, res) => {
    ───────────────────────────────────────── */
 export const createDept = async (req, res) => {
     try {
-        const { name, head, budget, fiscalYear } = req.body;
+        const { name, head, budget, fiscalYear, categoryLimits } = req.body;
         if (!name || !head || !budget) {
             return res.status(400).json({ success: false, message: 'Name, head, and budget are required' });
         }
-        const dept = await Department.create({ name, head, budget, fiscalYear });
+        const dept = await Department.create({ 
+            name, 
+            head, 
+            budget, 
+            fiscalYear,
+            categoryLimits: categoryLimits || [],
+            institution: req.user.institution._id 
+        });
         res.status(201).json({ success: true, data: dept });
     } catch (err) {
         if (err.code === 11000) {
@@ -47,7 +56,7 @@ export const createDept = async (req, res) => {
    ───────────────────────────────────────── */
 export const getDeptById = async (req, res) => {
     try {
-        const dept = await Department.findById(req.params.id);
+        const dept = await Department.findOne({ _id: req.params.id, institution: req.user.institution._id });
         if (!dept) {
             return res.status(404).json({ success: false, message: 'Department not found' });
         }
@@ -68,7 +77,7 @@ export const getDeptById = async (req, res) => {
    ───────────────────────────────────────── */
 export const updateDept = async (req, res) => {
     try {
-        const dept = await Department.findById(req.params.id);
+        const dept = await Department.findOne({ _id: req.params.id, institution: req.user.institution._id });
         if (!dept) {
             return res.status(404).json({ success: false, message: 'Department not found' });
         }
@@ -99,7 +108,7 @@ export const updateDept = async (req, res) => {
    ───────────────────────────────────────── */
 export const deleteDept = async (req, res) => {
     try {
-        const dept = await Department.findById(req.params.id);
+        const dept = await Department.findOne({ _id: req.params.id, institution: req.user.institution._id });
         if (!dept) {
             return res.status(404).json({ success: false, message: 'Department not found' });
         }
@@ -121,7 +130,7 @@ export const deleteDept = async (req, res) => {
    ───────────────────────────────────────── */
 export const getDeptStats = async (req, res) => {
     try {
-        const dept = await Department.findById(req.params.id);
+        const dept = await Department.findOne({ _id: req.params.id, institution: req.user.institution._id });
         if (!dept) {
             return res.status(404).json({ success: false, message: 'Department not found' });
         }
@@ -149,7 +158,8 @@ export const getDeptStats = async (req, res) => {
                 pending,
                 remaining:     Math.max(0, dept.budget - dept.spent),
                 utilizationPct: dept.utilizationPct,
-                fiscalYear:    dept.fiscalYear
+                fiscalYear:    dept.fiscalYear,
+                categoryLimits: dept.categoryLimits
             }
         });
     } catch (err) {

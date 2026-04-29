@@ -25,8 +25,13 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['admin', 'dept'],
+            enum: ['admin', 'finance_officer', 'dept'],
             default: 'dept'
+        },
+        institution: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Institution',
+            required: [true, 'Institution context is required']
         },
         department: {
             type: mongoose.Schema.Types.ObjectId,

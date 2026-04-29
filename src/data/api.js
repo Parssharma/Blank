@@ -132,7 +132,85 @@ export const requestApi = {
         apiFetch(`/requests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
     delete: (id) =>
-        apiFetch(`/requests/${id}`, { method: 'DELETE' })
+        apiFetch(`/requests/${id}`, { method: 'DELETE' }),
+
+    addComment: (id, text) =>
+        apiFetch(`/requests/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) })
+};
+
+/* ═══════════════════════════════════════
+   NOTIFICATIONS
+═══════════════════════════════════════ */
+export const notificationApi = {
+    getAll: () =>
+        apiFetch('/notifications'),
+
+    markAsRead: (id) =>
+        apiFetch(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+    markAllRead: () =>
+        apiFetch('/notifications/read-all', { method: 'PATCH' })
+};
+
+/* ═══════════════════════════════════════
+   ANALYTICS & REPORTS (Phase 3)
+═══════════════════════════════════════ */
+export const analyticsApi = {
+    getForecast: () =>
+        apiFetch('/analytics/forecast'),
+
+    getInsights: () =>
+        apiFetch('/analytics/insights'),
+
+    getComparative: () =>
+        apiFetch('/analytics/comparative'),
+
+    downloadReport: async () => {
+        const res = await fetch(`${API_BASE}/analytics/export`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('bw_token')}` }
+        });
+        if (!res.ok) throw new Error('Failed to download report');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `budgetwise_report_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+};
+
+/* ═══════════════════════════════════════
+   FINANCE OFFICER
+═══════════════════════════════════════ */
+export const financeApi = {
+    getRequests: () =>
+        apiFetch('/finance/requests'),
+
+    forwardRequest: (id) =>
+        apiFetch(`/finance/forward/${id}`, { method: 'POST' }),
+
+    rejectRequest: (id, comment) =>
+        apiFetch(`/finance/reject/${id}`, {
+            method: 'POST',
+            body: JSON.stringify({ comment })
+        }),
+
+    requestRevision: (id, comment) =>
+        apiFetch(`/finance/revise/${id}`, {
+            method: 'POST',
+            body: JSON.stringify({ comment })
+        }),
+
+    adjustBudget: (deptId, data) =>
+        apiFetch(`/finance/adjust-budget/${deptId}`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+        }),
+
+    getExpenseTrends: () =>
+        apiFetch('/finance/expense-trends')
 };
 
 /* ── Fiscal year helper (client-side, no DB needed) ── */

@@ -23,6 +23,25 @@ const departmentSchema = new mongoose.Schema(
             default: 0,
             min: [0, 'Spent cannot be negative']
         },
+        categoryLimits: [
+            {
+                category: { type: String, required: true },
+                limit: { type: Number, required: true },
+                spent: { type: Number, default: 0 }
+            }
+        ],
+        // Budget limits per period (e.g., monthly, quarterly)
+        budgetLimits: [
+            {
+                period: { type: String, required: true, enum: ['monthly', 'quarterly', 'yearly'] },
+                amount: { type: Number, required: true, min: 0 }
+            }
+        ],
+        institution: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Institution',
+            required: [true, 'Institution context is required']
+        },
         fiscalYear: {
             type: String,
             default: () => {
